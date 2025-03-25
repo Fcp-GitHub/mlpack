@@ -24,7 +24,7 @@ X_train, X_test, y_train, y_test = train_test_split(X, y,
                                                     )   
 
 # Perceptron classifier
-ova = fcp.OneVsAll(fcp.Perceptron)
+ova = fcp.OneVsAll(fcp.Perceptron, args=[0,0.1,100,1e-3])
 perceptron = Perceptron(max_iter=100,       # Maximum number of epochs
                         eta0=0.1,           # Learning rate
                         random_state=42     # Seed of random number generator

@@ -9,7 +9,7 @@ class OneVsAll:
     def __init__(self, classifier, args=None):
         self.classifier = classifier
         self.classifier_args = args
-        self.carray = None
+        self.cdict = None
 
     def train(self, X_train: np.ndarray, y_train: np.ndarray):
         """
@@ -25,18 +25,18 @@ class OneVsAll:
         # Get number of needed classifiers (number of classes)
         num_classifiers = classes.shape[0]
         # Definition of the array of classifiers
-        self.carray = np.ndarray((num_classifiers,), dtype=object)
+        self.cdict = {}
         if self.classifier_args is not None:
-            for i in range(0,num_classifiers):
-                self.carray[i] = self.classifier(*self.classifier_args)
+            for label in classes:
+                self.cdict[label] = self.classifier(*self.classifier_args)
         else:
-            for i in range(0,num_classifiers):
-                self.carray[i] = self.classifier()
+            for label in classes:
+                self.cdict[label] = self.classifier()
 
         # Iterate through all the different classes
-        for label,classifier in zip(classes,self.carray):
-            new_y_train = np.where(y_train == label, label, 0)
-            classifier.train(X_train,new_y_train)
+        for label,classifier in self.cdict.items():
+            new_y_train = np.where(y_train == label, 1, 0) 
+            classifier.train(X_train, new_y_train)
 
 
     def classify(self, X):
@@ -58,14 +58,15 @@ class OneVsAll:
             # VECTOR
             # Best prediction based on confidence score
             best_pred = 0
+            chosen_label = 0 
 
-            for classifier in self.carray:
+            for label,classifier in self.cdict.items():
                 new_score = classifier.activation_function(X)
                 if new_score > highest_score:
                     highest_score = new_score
-                    best_pred = classifier.classify(X)
+                    chosen_label = label
 
-            return best_pred
+            return chosen_label
 
         else:
             # MATRIX
@@ -79,7 +80,7 @@ class OneVsAll:
 
 
 class Perceptron:
-    def __init__(self, bias=0, learning_rate=0.3, max_iterations=None, iter_error=None):
+    def __init__(self, bias=0, learning_rate=0.3, max_epochs=1000, tolerance=1e-3):
         """
         Perceptron class constructor.
 
@@ -88,21 +89,70 @@ class Perceptron:
         ----------
         bias: bias that can be used to translate the decision boundary.
         learning_rate:
-        max_iterations:
+        max_epochs:
         iter_error:
         """
-        self.bias     = bias
-        self.eta      = learning_rate
-        self.gamma    = iter_error
-        self.max_iter = max_iterations
-        self.weights  = None
-        self.labels   = None
+        if (max_epochs is None) or (max_epochs <= 0) or (not isinstance(max_epochs, int)):
+            raise ValueError("Perceptron: `max_epochs` must be a positive natural number.")
+        if (tolerance is None) or (tolerance <= 0): 
+           raise ValueError("Perceptron: `tolerance` must be a positive real number.")
 
-    def activation_function(self, X):
+        self.bias       = bias
+        self.eta        = learning_rate
+        self.max_epochs = max_epochs
+        self.tol        = tolerance
+        self.weights    = None
+        #self.labels    = None
+
+    def _convert_to_useful_data(self, X: np.ndarray):
+        """
+        Internal method for internal conversion and analysis of inputted data.
+
+
+        Returns
+        --------
+        _X: input data properly converted.
+        _is_vector: boolean value that is `True` if X is a vector (single sample), 
+                    `False` otherwise.
+        _num_samples: number of samples contained in X. 
+                      `_num_samples` is equal to `1` if `_is_vector` is `True`.
+        """
+        # Check if X is a np.ndarray instance
+        _X = None
+        if not isinstance(X, np.ndarray):
+           _X = np.asarray(X)
+        else:
+            _X = X
+
+        # Check if X is a vector or a matrix
+        _is_vector = _X.ndim == 1
+
+        # Get number of samples 
+        _num_samples = 0
+        if _is_vector:
+            _num_samples = 1
+        else:
+            _num_samples = _X.shape[0]
+
+        # If X is a vector...
+        if _is_vector:
+            _X = np.append(_X, 1)
+        else:
+            _X = np.c_[ X, np.ones(_num_samples) ]
+
+        return _X, _is_vector, _num_samples
+
+    def activation_function(self, X: np.ndarray):
         """
         Perceptron's activation function. Used for predicting the confidence scores for samples.
+
+
+        Parameters
+        ----------
+        X: a monodimensional np.ndarray.
         """
-        return np.dot(self.weights,X)
+        _X = self._convert_to_useful_data(X)[0]
+        return np.dot(self.weights,_X)
 
     def classify(self, X: np.ndarray):
         """
@@ -119,48 +169,28 @@ class Perceptron:
 
         Returns
         -------
-        Scalar or np.ndarray vector based on X's shape.
+        Scalar or np.ndarray vector based on X's shape. As the original Perceptron
+        algorithms, returns 0 ("no") or 1 ("yes") based on the classification result.
         """
         # Input validation
-        if not isinstance(X, np.ndarray):
-            X = np.asarray(X)
+        _X, _is_vector, _num_samples = self._convert_to_useful_data(X) 
 
         # Classification algorithm
-        _is_vector = X.ndim == 1
-
-        # Distinguish between vector and matrix case:
-        if _is_vector:
-            # VECTOR
-            # 1. Initialize classification to zero
-            classification = 0
-
-            # 2. Apply formula:
-            # 2.1. Compute scalar product: <w,x>
-            _dot = np.dot(X, self.weights)
-            _res = np.heaviside(_dot, 0)
-            # 2.2. Result
-            if _res > 0:
-                classification = self.labels[1]
-            else:
-                classification = self.labels[0]
+        classification = np.zeros(_num_samples)
             
-            return classification
-        else:
-            # MATRIX
-            _num_samples = X.shape[0]
-            # 1. Initialize classification array to zero
-            classification = np.zeros(_num_samples)  
-            
-            # 2. For every sample: 
-            for i in range(0,_num_samples):
-                # 2.1. Compute scalar product: <w,x>
+        # For every sample: 
+        for i in range(0,_num_samples):
+            # Compute scalar product: <w,x>
+            if not _is_vector:
                 _dot = np.dot(X[i], self.weights)
-                # 2.2. Compute Heaviside function
-                _res = np.heaviside(_dot, 0)
-                # 2.3. Append result
-                classification[i] = _res
+            else:
+                _dot = np.dot(X, self.weights)
+            # Compute Heaviside function
+            _res = np.heaviside(_dot, 0)
+            # Append result
+            classification[i] = _res
 
-            return classification
+        return classification
 
 
     def train(self, X_train: np.ndarray, y_train: np.ndarray):
@@ -179,48 +209,37 @@ class Perceptron:
         multiclass classification.
         """
         # Input validation
-        if not isinstance((X_train, y_train), np.ndarray):
-            X_train = np.asarray(X_train)
+        if not isinstance(y_train, np.ndarray):
             y_train = np.asarray(y_train)
-        # Check if X is a vector
-        _is_vector = X_train.ndim == 1
+        
+        _X_train, _is_vector, _num_samples = self._convert_to_useful_data(X_train)
 
-        # Testing set size
-        _tset_size = y_train.shape[0]
-
-        # Number of features
-        num_features = X_train.shape[0] if X_train.ndim == 1 else X_train.shape[1]
+        # Number of features per sample
+        _num_features = _X_train.shape[0] if _is_vector else _X_train.shape[1]
 
         # Initizialize weights
-        self.weights = np.zeros(num_features)
+        self.weights = np.random.rand(_num_features) #np.zeros(_num_features)
         self.weights[-1] = self.bias    # Append bias
-        print(self.bias)
         
         # Deduce the two labels and store them for later
-        self.labels = np.unique_counts(y_train).values
+        #self.labels = np.unique_counts(y_train).values
 
-        if self.max_iter is not None:
-            for i in range(0, self.max_iter):
-                # 1. Compute predicted value
-                _y_hat = self.classify(X_train[i])
-                # 2. Update weigths accordingly
-                self.weights += self.eta * (y_train[i] - _y_hat) * X_train[i]
-
-        elif self.gamma is not None:
-            _current_eta = np.inf
-            while _current_eta < np.eta:
-                _current_eta = np.inf
-                for sample,y_des in zip(X_train, y_train):
+        # Loop through all the epochs until loop number `max_epochs` is reached
+        # or until we've reached the desired tolerance `tolerance`
+        for i in range(0, self.max_epochs):
+            # Define current tolerance
+            _current_tol = np.inf
+            # Check if we've reached desired tolerance
+            if _current_tol > self.tol:
+                # Prepare current tolerance for incoming epoch
+                _current_tol = 0
+                # Loop through the training data set
+                for sample, y_des in zip(_X_train, y_train):
                     # 1. Compute predicted value
                     _y_hat = self.classify(sample)
-                    # 2. Update weights accordingly
+                    # 2. Update weigths accordingly
                     self.weights += self.eta * (y_des - _y_hat) * sample
-                    # 3. Update current eta
-                    _current_eta += 1/_tset_size * np.abs(y_des - _y_hat) * sample
-        
-        else:
-            for sample,y_des in zip(X_train, y_train):
-                    # 1. Compute predicted value
-                    _y_hat = self.classify(sample)
-                    # 2. Update weights accordingly
-                    self.weights += self.eta * (y_des - _y_hat) * sample
+                    # 3. Update current tolerance
+                    _current_tol += 1/_num_samples * np.abs(y_des - _y_hat)
+            else:
+                break
