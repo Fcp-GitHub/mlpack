@@ -8,7 +8,7 @@ from sklearn.linear_model import Perceptron             # perceptron
 from sklearn.metrics import accuracy_score              # compute accuracy of the classifier
 from sklearn.metrics import classification_report       # classification metrics
 
-import fcp
+import fcp  # For OneVsAll and Perceptron
 
 # Load dataset as a (data, target) tuple of two ndarrays:
 #   data:   contains a 2D ndarray of shape (1797,64) with each row
@@ -18,7 +18,7 @@ X, y = load_digits(return_X_y=True)
 
 # Split dataset into training/validation and testing/heldout data
 X_train, X_test, y_train, y_test = train_test_split(X, y,
-                                                    test_size=0.2,  # 20 % of dataset is for testing
+                                                    test_size=0.3,  # 20 % of dataset is for testing
                                                     random_state=42 # Seed of random number generator
                                                                     # Passing an integer ensures reproducibility of the results
                                                     )   
@@ -31,18 +31,15 @@ perceptron = Perceptron(max_iter=100,       # Maximum number of epochs
                         )
 
 # Train classifier
-ova.train(X_train, y_train)
+ova.fit(X_train, y_train)
 perceptron.fit(
         X_train,    # Training data
         y_train     # Target values
         )    
 
 # Predict class labels for samples in test dataset 
-fcp_y_pred = ova.classify(X_test)
+fcp_y_pred = ova.predict(X_test)
 y_pred = perceptron.predict(X_test)
-
-print(fcp_y_pred)
-print(y_pred)
 
 # Compute accuracy of predictions
 accuracy = accuracy_score(y_test, fcp_y_pred)

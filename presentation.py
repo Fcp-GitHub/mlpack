@@ -1,0 +1,114 @@
+import numpy as np
+import matplotlib.pyplot as plt
+import fcp
+import visualize as v
+
+from sklearn.datasets import load_digits
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import accuracy_score, classification_report, confusion_matrix
+
+def pprint(title: str):
+    print()
+    print(title.center(30))
+    print('-'*30)
+
+def present(classifier1: dict, classifier2: dict):
+    """
+    Demonstrate `classifier1` (sklearn classifier) and `classifier2` (fcp classifier) in order to compare them using the handwritten
+    digits dataset that comes with the scikit-learn library.
+
+
+    The presentation follows the following order:
+        - Accuracy scores
+        - Classification reports
+        - Confusion matrices
+        - Learning curve
+        - Results visualization
+
+    Parameters:
+    `classifier1` and `classifier2` must be two dictionaries containing (in order):
+        - `clf` : the actual classifier class, with methods `fit` and `predict`
+        - `name`: a string containing a user-friendly name of the classifier
+    """
+
+    # Validate input
+    if classifier1 is None:
+        raise ValueError("present: `classifier1` is None.")
+    if classifier2 is None:
+        raise ValueError("present: `classifier2` is None.")
+
+    # Load parameters separately
+    c1, name1 = classifier1.values()
+    c2, name2 = classifier2.values()
+
+    # Load dataset
+    X, y = load_digits(return_X_y=True)
+
+    # Split dataset into training/validation and testing/heldout data
+    X_train, X_test, y_train, y_test = train_test_split(
+            X, y,
+            test_size=0.3, # 30 % of the total dataset is for testing
+            random_state=42 # Seed of rnd generator in order to ensure reproducibility of the results
+            )
+
+    # Train classifiers    
+    c1.fit(X_train, y_train)
+    c2.fit(X_train, y_train)
+    
+    # Make them classify data
+    pred1 = c1.predict(X_test)
+    pred2 = c2.predict(X_test)
+
+    #TODO: print side-by-side  
+    # Accuracy scores
+    pprint("ACCURACY SCORES")
+    accuracy = accuracy_score(y_test, pred1)
+    print(f'Accuracy of {name1}: {accuracy}')
+    accuracy = accuracy_score(y_test, pred2)
+    print(f'Accuracy of {name2}: {accuracy}')
+
+    # Classification reports
+    pprint("CLASSIFICATION REPORT")
+    class_report = classification_report(y_test, pred1)
+    print(f'Classification report for {name1}:\n', class_report)
+    class_report = classification_report(y_test, pred2)
+    print(f'Classification report for {name2}:\n', class_report)
+    
+    # Confusion matrices
+    pprint("CONFUSION MATRICES")
+    cm = confusion_matrix(y_test, pred1)
+    print(f'Confusion matrix for {name1}:\n', cm)
+    cm = confusion_matrix(y_test, pred2)
+    print(f'Confusion matrix for {name2}:\n', cm)
+    return
+
+    # Learning curve
+    # Different percentages of held-out data
+    heldout = [0.95, 0.9, 0.75, 0.5, 0.01]
+    # Different percentages of validation dataset
+    validation = 1. - np.array(heldout)
+
+    for classifier in [classifier1, classifier2]:
+        clf, name = classifier.values()
+        res = []
+        for i in heldout:
+            print(f'Training {name} with {i}\% heldout value')
+            _res = []
+            for r in range(len(heldout)):
+                X_train, X_test, y_train, y_test = train_test_split(
+                        X, y, test_size=i, random_state=42
+                        )
+                clf.fit(X_train, y_train)
+                y_pred = clf.predict(X_test)
+                _res.append(1 - np.mean(y_pred == y_test))
+            res.append(np.mean(_res))
+        plt.plot(validation, res, label=name)
+
+    plt.legend(loc="upper right")
+    plt.xlabel("Proportion train")
+    plt.ylabel("Test Error Rate")
+
+    # Results Visualization  
+    pprint("RESULTS VISUALIZATION")
+    v.predictions_plot(X_test, pred1, y_test)
+    v.predictions_plot(X_test, pred2, y_test)
