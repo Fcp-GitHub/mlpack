@@ -7,6 +7,7 @@ from sklearn.model_selection import train_test_split    # split dataset into tra
 from sklearn.linear_model import Perceptron             # perceptron
 from sklearn.metrics import accuracy_score              # compute accuracy of the classifier
 from sklearn.metrics import classification_report       # classification metrics
+from sklearn.metrics import confusion_matrix
 
 import fcp  # For OneVsAll and Perceptron
 
@@ -52,3 +53,9 @@ class_report = classification_report(y_test, fcp_y_pred)
 print("Classification Report:\n", class_report)
 class_report = classification_report(y_test, y_pred)
 print("Classification Report:\n", class_report)
+
+# Confusion matrix
+cm = confusion_matrix(y_test, fcp_y_pred)
+print("Confusion Matrix:\n", cm)
+cm = confusion_matrix(y_test, y_pred)
+print("Confusion Matrix:\n", cm)

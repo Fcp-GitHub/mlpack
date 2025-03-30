@@ -80,7 +80,6 @@ def present(classifier1: dict, classifier2: dict):
     print(f'Confusion matrix for {name1}:\n', cm)
     cm = confusion_matrix(y_test, pred2)
     print(f'Confusion matrix for {name2}:\n', cm)
-    return
 
     # Learning curve
     # Different percentages of held-out data
@@ -103,7 +102,6 @@ def present(classifier1: dict, classifier2: dict):
                 _res.append(1 - np.mean(y_pred == y_test))
             res.append(np.mean(_res))
         plt.plot(validation, res, label=name)
-
     plt.legend(loc="upper right")
     plt.xlabel("Proportion train")
     plt.ylabel("Test Error Rate")

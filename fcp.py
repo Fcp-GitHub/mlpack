@@ -2,19 +2,54 @@ import numpy as np
 import matplotlib.pyplot as plt
 from scipy.optimize import fmin_cg
 from sklearn.datasets import load_digits
+from concurrent.futures import ProcessPoolExecutor
 
 class OneVsAll:
     """
     Implementation of One-Vs-Rest strategy for binary classifiers.
+    
+
+    The 'OneVsAll' class uses 'concurrent.futures.ProcessPoolExecutor'
+    (added with python 3.2) in order to speed up execution via multiprocessing.
     """
     def __init__(self, classifier, args=None):
         self.classifier = classifier
         self.classifier_args = args
         self.cdict = None
 
+    def _run_cpu_tasks_in_parallel(self, tasks, fnargs):
+        """
+        Run tasks concurrently in order to avoid as much overhead as possible.
+
+
+        Parameters
+        ----------
+        tasks : list of functions to call
+        fnargs: list of arguments to be used per function
+
+        Return value
+        ------------
+        Returns the list of return values if the tasks have one, otherwise a list 
+        of `None` is returned.
+        """
+        with ProcessPoolExecutor() as executor:
+            # Submit all tasks for parallel execution
+            futures = [executor.submit(task,*fnarg) for task,fnarg in zip(tasks,fnargs)]
+            results = [None]*len(futures)
+            for i,future in zip(range(len(futures)), futures):
+                results[i] = future.result() # Get result
+        return results
+
+    def _parallel_fit(self, classifier, fnargs):
+        """
+        Internal method for parallelization of fitting method.
+        """
+        classifier.fit(*fnargs)     # Execute learning algorithm
+        return classifier.weights   # Return updated weights
+
     def fit(self, X_train: np.ndarray, y_train: np.ndarray):
         """
-        Train each classifier with its own learning algorithm.
+        Train each classifier with its own set of classes.
         """
         # Input validation
         if not isinstance((X_train, y_train), np.ndarray):
@@ -34,11 +69,20 @@ class OneVsAll:
             for label in classes:
                 self.cdict[label] = self.classifier()
 
-        # Iterate through all the different classes
-        for label,classifier in self.cdict.items():
-            new_y_train = np.where(y_train == label, 1, 0) 
-            classifier.fit(X_train, new_y_train)
+        fnargs = [None]*num_classifiers
+        tasks  = [None]*num_classifiers
 
+        # Iterate through all the different classes and save function
+        # arguments for later
+        for i,(label,clf) in zip(range(num_classifiers), self.cdict.items()):
+            new_y_train = np.where(y_train == label, 1, 0) 
+            fnargs[i] = [clf, [X_train, new_y_train]]
+            tasks[i]  = self._parallel_fit
+        
+        # Run learning algorithm for all classifiers (hopefully) concurrently
+        results = self._run_cpu_tasks_in_parallel(tasks, fnargs)
+        for clf,result in zip(self.cdict.values(), results):
+            clf.weights = result
 
     def predict(self, X):
         """
@@ -62,6 +106,7 @@ class OneVsAll:
             chosen_label = 0 
 
             for label,classifier in self.cdict.items():
+                #print(classifier)
                 new_score = classifier.activation_function(X)
                 if new_score > highest_score:
                     highest_score = new_score
@@ -144,7 +189,7 @@ class Perceptron:
             _X = np.c_[ X, np.ones(_num_samples) ]
         
         # Number of features per sample
-        _num_features = _X.shape[0] if _is_vector else _X.shape[1]
+        _num_features = _X.shape[-1]
 
         return _X, _is_vector, _num_samples, _num_features
 
@@ -179,7 +224,7 @@ class Perceptron:
         algorithms, returns 0 ("no") or 1 ("yes") based on the classification result.
         """
         # Input validation
-        _X, _is_vector, _num_samples = self._convert_to_useful_data(X)
+        _X, _is_vector, _num_samples = self._convert_to_useful_data(X)[:3]
         # TODO: this is a bad fix
         if self._internal_call:
             _X = X
@@ -220,9 +265,11 @@ class Perceptron:
         # Input validation
         if not isinstance(y_train, np.ndarray):
             y_train = np.asarray(y_train)
-        
+
         _X_train, _is_vector, _num_samples, _num_features = self._convert_to_useful_data(X_train)
 
+        #print("\nIn fit method")
+        #print(self.fit)
         # Initizialize weights
         self.weights = np.random.rand(_num_features) #np.zeros(_num_features)
         self.weights[-1] = self.bias    # Append bias
@@ -294,7 +341,7 @@ class LogisticRegression:
             _X = np.c_[ X, np.ones(_num_samples) ]
         
         # Number of features per sample
-        _num_features = _X.shape[0] if _is_vector else _X.shape[1]
+        _num_features = _X.shape[-1]
 
         return _X, _is_vector, _num_samples, _num_features
 
@@ -307,9 +354,7 @@ class LogisticRegression:
         -------------------------------
         Converts input to useful data.
         """
-
-        _X = self._convert_to_useful_data(X)
-
+        _X = self._convert_to_useful_data(X)[0]
         z = np.dot(self.weights,_X)
         return 1 / (1 + np.exp(-z))
 
@@ -345,11 +390,11 @@ class LogisticRegression:
                 _g[i] = np.sum(y+_s)*x[i]
             return _g
 
-        # TODO: I don't like this
-        _,_,_,_num_features = self._convert_to_useful_data(X)
+        # TODO: is there a better way?
+        _num_features = self._convert_to_useful_data(X)[-1]
 
         # Initialize weights
-        self.weights = np.zeros(_num_features) 
+        self.weights = np.random.rand(_num_features) #np.zeros(_num_features) 
         self.weights[-1] = self.bias
 
         # Find weights by optimization of the loss function
