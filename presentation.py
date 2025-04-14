@@ -86,14 +86,19 @@ def present(classifier1: dict, classifier2: dict):
     heldout = [0.95, 0.9, 0.75, 0.5, 0.01]
     # Different percentages of validation dataset
     validation = 1. - np.array(heldout)
+    
+    # Number of times to fit and evaluate the same estimator with same heldout
+    rounds = 3
+
+    plt.figure("Learning curve")
 
     for classifier in [classifier1, classifier2]:
         clf, name = classifier.values()
         res = []
         for i in heldout:
-            print(f'Training {name} with {i}\% heldout value')
+            print(f'Training {name} with {i}% heldout value')
             _res = []
-            for r in range(len(heldout)):
+            for r in range(rounds):
                 X_train, X_test, y_train, y_test = train_test_split(
                         X, y, test_size=i, random_state=42
                         )
@@ -108,5 +113,7 @@ def present(classifier1: dict, classifier2: dict):
 
     # Results Visualization  
     pprint("RESULTS VISUALIZATION")
-    v.predictions_plot(X_test, pred1, y_test)
-    v.predictions_plot(X_test, pred2, y_test)
+    v.predictions_plot(X_test, pred1, y_test, title=name1)
+    v.predictions_plot(X_test, pred2, y_test, title=name2)
+
+    print()

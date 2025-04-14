@@ -1,14 +1,1 @@
-main:
-	Show dataset via PCA 
-	Simply activate each module in sequence
-
-perceptron, logistic regression, svc_linear, svc_rbf, neural_link:
-	Comparison between sklearn's and my implementation:
-		- Show results for a simple case, with:
-			- Results visualization
-			- Accuracy scores
-			- Classification reports
-			- Learning curve
-			- Confusion matrices
-	Since the same operations have to be performed for all the files, a separate
-	utility function should be defined.
+Make a base class for all classifiers.

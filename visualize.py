@@ -1,7 +1,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
 
-def predictions_plot(X: np.ndarray, y_pred: np.ndarray, y_exp: np.ndarray, num_images=64, num_subplots_x=8, num_subplots_y=8):
+def predictions_plot(X: np.ndarray, y_pred: np.ndarray, y_exp: np.ndarray, title="", num_images=64, num_subplots_x=8, num_subplots_y=8):
     """
     Plot digits with predictions of color green if y_pred = y_exp or red otherwise.
 
@@ -32,7 +32,7 @@ def predictions_plot(X: np.ndarray, y_pred: np.ndarray, y_exp: np.ndarray, num_i
     _y_exp  = _convert_to_np(y_exp)
 
     # Generate plt.Figure and adjust subplots' layout
-    _fig = plt.figure(figsize=(6, 6))
+    _fig = plt.figure(num=title, figsize=(6, 6))
     _fig.subplots_adjust(left=0, right=1, bottom=0, top=1,
                          hspace=0.05, wspace=0.05
                         )

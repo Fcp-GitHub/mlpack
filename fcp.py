@@ -1,8 +1,137 @@
+import abc
+import warnings
 import numpy as np
 import matplotlib.pyplot as plt
-from scipy.optimize import fmin_cg
 from sklearn.datasets import load_digits
+from sklearn.preprocessing import StandardScaler
 from concurrent.futures import ProcessPoolExecutor
+
+class Classifier(abc.ABC):
+    """
+    Base class for all classifiers of `fcp` module.
+    """
+    def __init__(self, bias, learning_rate, max_epochs, tolerance, warnings_on=False):
+
+        if (max_epochs is None) or (max_epochs <= 0) or (not isinstance(max_epochs, int)):
+            raise ValueError(f'{self.__str__}: `max_epochs` must be a positive natural number.')
+        if (tolerance is None) or (tolerance <= 0): 
+           raise ValueError(f'{self.__str__}: `tolerance` must be a positive real number.')
+
+        self.bias = bias
+        self.learning_rate = learning_rate
+        self.max_epochs = max_epochs
+        self.tol = tolerance
+        self.weights = None
+        self.labels = None
+        self.warnings_on = warnings_on
+
+        # Inizialize internal standard scaler
+        self.scaler = StandardScaler()
+
+    def _cc_data(self, X: np.ndarray, y: np.ndarray = None):
+        """
+        Check and convert data if needed.
+        Internal method.
+
+        Returns
+        --------
+        _X: input data properly converted.
+        """
+        # Check if X is a np.ndarray instance
+        if isinstance(X, np.ndarray):
+            _X = X
+        else:
+            _X = np.asarray(X)
+
+        # Check if y, if given, is a np.ndarray instance
+        if y is not None:
+            if isinstance(y, np.ndarray):
+                _y = y
+            else:
+                _y = np.asarray(y)
+
+        # If X is a vector...
+        if _is_vector:
+            _X = np.append(_X, 1)
+        else:
+            _X = np.c_[ X, np.ones(_num_samples) ]
+
+        return _X, _y
+
+    def _is_vector(self, X: np.ndarray):
+        """
+        Check if given `X` is a vector or not.
+        Internal method.
+        """
+        return X.ndim == 1
+
+    def _get_num_samples(self, X: np.ndarray):
+        """
+        Get number of samples by inspection of `X`.
+        """
+        return 1 if self._is_vector(X) else X.shape[0]
+
+    def _get_num_features(self, X: np.ndarray):
+        """
+        Get number of features by inspection of `X`.
+        """
+        return X.shape[-1]
+
+    #TODO: this method is not used.
+    #      It can be safely removed, unless I want to implement
+    #      a custom standard scaler class.
+    def _std_data(self, X: np.ndarray):
+        """
+        Data standardization method.
+        """
+        # Data standardization along `0`-th axis (per feature axis)
+        _mu = np.mean(X, axis=0)       # Get training data's PDF centroid
+        _std = np.std(X, axis=0)       # Get training data's PDF standard deviation
+        return (X - _mu) / (_std + 1e-8)    # Add small epsilon in order to avoid division by zero
+        
+    @abc.abstractmethod
+    def activation_function(self, X: np.ndarray):
+        pass
+
+    @abc.abstractmethod
+    def _internal_predict(self, X: np.ndarray):
+        pass 
+
+    def predict(self, X: np.ndarray):
+        _X = self.scaler.transform(X)
+        return self._internal_predict(_X)
+
+    @abc.abstractmethod
+    def _internal_fit(self, X_train: np.ndarray, y_train: np.ndarray):
+        pass
+
+    def fit(self, X_train: np.ndarray, y_train: np.ndarray):
+        # Input validation
+        if not isinstance(y_train, np.ndarray):
+            y_train = np.asarray(y_train)
+
+        # Initialize weights
+        self.weights = np.random.rand(self._get_num_features(X_train))
+
+        # Standardize data
+        _X = self.scaler.fit_transform(X_train)
+
+        # Initialize current tolerance
+        _current_tol = np.inf
+        # Loop through all epochs or until the desired tolerance is reached
+        for _ in range(self.max_epochs):
+            # Check if desired tolerance was reached
+            if _current_tol > self.tol:
+                # Loop through training data set using classifier-
+                # specific learning algorithm and get current tolerance value
+                _current_tol = self._internal_fit(_X, y_train)
+            else:
+                return
+
+        if self.warnings_on:
+            # If function hasn't returned yet, it means that the number of epochs
+            # wasn't enough to reach convergence
+            warnings.warn("Convergence wasn't reached within the specified number of epochs!")
 
 class OneVsAll:
     """
@@ -12,7 +141,7 @@ class OneVsAll:
     The 'OneVsAll' class uses 'concurrent.futures.ProcessPoolExecutor'
     (added with python 3.2) in order to speed up execution via multiprocessing.
     """
-    def __init__(self, classifier, args=None):
+    def __init__(self, classifier: Classifier, args=None):
         self.classifier = classifier
         self.classifier_args = args
         self.cdict = None
@@ -125,8 +254,8 @@ class OneVsAll:
             return best_predictions
 
 
-class Perceptron:
-    def __init__(self, bias=0, learning_rate=0.3, max_epochs=1000, tolerance=1e-3):
+class Perceptron(Classifier):
+    def __init__(self, bias=0, learning_rate=0.3, max_epochs=1000, tolerance=1e-3, *args, **kwargs):
         """
         Perceptron class constructor.
 
@@ -138,60 +267,7 @@ class Perceptron:
         max_epochs:
         iter_error:
         """
-        if (max_epochs is None) or (max_epochs <= 0) or (not isinstance(max_epochs, int)):
-            raise ValueError("Perceptron: `max_epochs` must be a positive natural number.")
-        if (tolerance is None) or (tolerance <= 0): 
-           raise ValueError("Perceptron: `tolerance` must be a positive real number.")
-
-        self.bias       = bias
-        self.eta        = learning_rate
-        self.max_epochs = max_epochs
-        self.tol        = tolerance
-        self.weights    = None
-        #self.labels    = None
-        self._internal_call = False
-
-    def _convert_to_useful_data(self, X: np.ndarray):
-        """
-        Internal method for internal conversion and analysis of inputted data.
-
-
-        Returns
-        --------
-        _X: input data properly converted.
-        _is_vector: boolean value that is `True` if `X` is a vector (single sample), 
-                    `False` otherwise.
-        _num_samples: number of samples contained in `X`. 
-                      `_num_samples` is equal to `1` if `_is_vector` is `True`.
-        _num_features: number of features per sample contained in `X`.
-        """
-        # Check if X is a np.ndarray instance
-        _X = None
-        if not isinstance(X, np.ndarray):
-           _X = np.asarray(X)
-        else:
-            _X = X
-
-        # Check if X is a vector or a matrix
-        _is_vector = _X.ndim == 1
-
-        # Get number of samples 
-        _num_samples = 0
-        if _is_vector:
-            _num_samples = 1
-        else:
-            _num_samples = _X.shape[0]
-
-        # If X is a vector...
-        if _is_vector:
-            _X = np.append(_X, 1)
-        else:
-            _X = np.c_[ X, np.ones(_num_samples) ]
-        
-        # Number of features per sample
-        _num_features = _X.shape[-1]
-
-        return _X, _is_vector, _num_samples, _num_features
+        super().__init__(bias, learning_rate, max_epochs, tolerance, *args, **kwargs)
 
     def activation_function(self, X: np.ndarray):
         """
@@ -202,10 +278,10 @@ class Perceptron:
         ----------
         X: a monodimensional np.ndarray.
         """
-        _X = self._convert_to_useful_data(X)[0]
-        return np.dot(self.weights,_X)
+        _dot = np.dot(self.weights, X)
+        return _dot + self.bias
 
-    def predict(self, X: np.ndarray):
+    def _internal_predict(self, X: np.ndarray):
         """
         Perceptron's classification algorithm.
 
@@ -223,31 +299,30 @@ class Perceptron:
         Scalar or np.ndarray vector based on X's shape. As the original Perceptron
         algorithms, returns 0 ("no") or 1 ("yes") based on the classification result.
         """
-        # Input validation
-        _X, _is_vector, _num_samples = self._convert_to_useful_data(X)[:3]
-        # TODO: this is a bad fix
-        if self._internal_call:
-            _X = X
+        # Get useful input information
+        _is_vector = self._is_vector(X)
+        _num_samples = self._get_num_samples(X)
 
         # Classification algorithm
-        classification = np.zeros(_num_samples)
-            
-        # For every sample: 
-        for i in range(0,_num_samples):
-            # Compute scalar product: <w,x>
-            if not _is_vector:
-                _dot = np.dot(_X[i], self.weights)
-            else:
-                _dot = np.dot(_X, self.weights)
-            # Compute Heaviside function
-            _res = np.heaviside(_dot, 0)
-            # Append result
-            classification[i] = _res
+        if _is_vector:
+            _act = self.activation_function(X)
+            return np.heaviside(_act, 0)
+        else:
+            # Declare / Initialize classifications' array
+            classification = np.zeros(_num_samples)
+            # For every sample: 
+            for i in range(_num_samples):
+                # Compute activation function: <w,x> + b
+                _act = self.activation_function(X[i])
+                # Compute Heaviside function
+                _class = np.heaviside(_act, 0)
+                # Append result
+                classification[i] = _class
 
-        return classification
+            return classification
 
 
-    def fit(self, X_train: np.ndarray, y_train: np.ndarray):
+    def _internal_fit(self, X_train: np.ndarray, y_train: np.ndarray):
         """
         Rosenblatt's learning algorithm (1958) for the Perceptron classifier.
 
@@ -262,144 +337,87 @@ class Perceptron:
         This algorithm is for BINARY CLASSIFICATION. Use the OneVsAll class for
         multiclass classification.
         """
-        # Input validation
-        if not isinstance(y_train, np.ndarray):
-            y_train = np.asarray(y_train)
+        _is_vector = self._is_vector(X_train)
+        _num_samples = self._get_num_samples(X_train)
+        _num_features = self._get_num_features(X_train)
 
-        _X_train, _is_vector, _num_samples, _num_features = self._convert_to_useful_data(X_train)
+        # Define / Initialize current tolerance value variable
+        _current_tol = 0
 
-        #print("\nIn fit method")
-        #print(self.fit)
-        # Initizialize weights
-        self.weights = np.random.rand(_num_features) #np.zeros(_num_features)
-        self.weights[-1] = self.bias    # Append bias
-        
-        # Deduce the two labels and store them for later
-        #self.labels = np.unique_counts(y_train).values
+        # Loop through the training data set
+        for sample, y_des in zip(X_train, y_train):
+            # 1. Compute predicted value
+            _y_hat = self.predict(sample)
+            # 2. Update weigths accordingly 
+            self.weights += self.learning_rate * (y_des - _y_hat) * sample
+            self.bias += self.learning_rate * (y_des - _y_hat)
 
-        # Loop through all the epochs until loop number `max_epochs` is reached
-        # or until we've reached the desired tolerance `tolerance`
-        for i in range(0, self.max_epochs):
-            # Define current tolerance
-            _current_tol = np.inf
-            # Check if we've reached desired tolerance
-            if _current_tol > self.tol:
-                # Prepare current tolerance for incoming epoch
-                _current_tol = 0
-                # Loop through the training data set
-                for sample, y_des in zip(_X_train, y_train):
-                    # 1. Compute predicted value
-                    self._internal_call = True  # See previous TODO  
-                    _y_hat = self.predict(sample)
-                    self._internal_call = False # See previous TODO 
-                    # 2. Update weigths accordingly 
-                    self.weights += self.eta * (y_des - _y_hat) * sample
-                    # 3. Update current tolerance
-                    _current_tol += 1/_num_samples * np.abs(y_des - _y_hat)
-            else:
-                break
+            # 3. Update current tolerance
+            _current_tol += 1/_num_samples * np.abs(y_des - _y_hat)
+        return _current_tol
 
-class LogisticRegression:
-    def __init__(self, bias=0):
-        self.bias = bias
-        self.weights = None
-
-    def _convert_to_useful_data(self, X: np.ndarray):
+class LogisticRegression(Classifier):
+    def __init__(self, bias=0, learning_rate=0.3, max_epochs=1000, tolerance=1e-3, regularization=1e-2, *args, **kwargs):
+        self.regularization = regularization
+        super().__init__(bias, learning_rate, max_epochs, tolerance, *args, **kwargs)
+    
+    def sigmoid(self, z):
         """
-        Internal method for internal conversion and analysis of inputted data.
-
-
-        Returns
-        --------
-        _X: input data properly converted.
-        _is_vector: boolean value that is `True` if X is a vector (single sample), 
-                    `False` otherwise.
-        _num_samples: number of samples contained in X. 
-                      `_num_samples` is equal to `1` if `_is_vector` is `True`.
+        Sigmoid function applied to `z`.
         """
-        # Check if X is a np.ndarray instance
-        _X = None
-        if not isinstance(X, np.ndarray):
-           _X = np.asarray(X)
+        if z >= 0:
+            return 1 / (1 + np.exp(-z))
         else:
-            _X = X
+            return np.exp(z) / (1 + np.exp(z))
 
-        # Check if X is a vector or a matrix
-        _is_vector = _X.ndim == 1
 
-        # Get number of samples 
-        _num_samples = 0
-        if _is_vector:
-            _num_samples = 1
-        else:
-            _num_samples = _X.shape[0]
-
-        # If X is a vector...
-        if _is_vector:
-            _X = np.append(_X, 1)
-        else:
-            _X = np.c_[ X, np.ones(_num_samples) ]
-        
-        # Number of features per sample
-        _num_features = _X.shape[-1]
-
-        return _X, _is_vector, _num_samples, _num_features
-
-    def activation_function(self, X):
+    def activation_function(self, X: np.ndarray):
         """
-        Activation function of the logistic regression classifier. It is essentially a Heaviside function applied to the sigmoid function of the input values `X`.
-
-
-        Notes for internal implentation
-        -------------------------------
-        Converts input to useful data.
+        Activation function of the logistic regression classifier: the sigmoid 
+        of the dot product of the weights and the sample.
         """
-        _X = self._convert_to_useful_data(X)[0]
-        z = np.dot(self.weights,_X)
-        return 1 / (1 + np.exp(-z))
+        z = np.dot(X, self.weights) + self.bias
+        _res = np.array([self.sigmoid(zi) for zi in z])
+        return _res
 
-    def predict(self, X):
+
+    def _internal_predict(self, X: np.ndarray):
         """
         Logistic regression's classification algorithm.
         """
+        _act = self.activation_function(X)
+        _pred = np.array([1 if _a > 0.5 else 0 for _a in _act])
+        return _pred
 
-        if self.activation_function(X) > 0.5:
-            return 1
-        else:
-            return 0
 
-    def fit(self, X, y):
+    def _internal_fit(self, X_train, y_train, num_iterations=100):
         """Logistic regression's learning algorithm.
         Learning is performed using the cross-entropy loss function.
         """
-        
-        def _loss_function(x, *args):
-            """
-            Logistic regression's loss function.
-            """
-            _s = self.activation_function(x)
-            return np.sum(-y*np.log(_s) - (1-y)*np.log(1 - _s))
+        # Minimize loss function using gradient descent algorithm
+        # NOTE: GD is not the best algorithm for several reasons, so 
+        #       a better one could be implemented in the future...
 
-        def _gradient_loss_function(x, *args):
-            """
-            Gradient of logistic regression's loss function.
-            """
-            _s = self.activation_function(x)
-            _g = np.zeros(y.shape[0]+1)
-            for i in range(y.shape[0]+1):
-                _g[i] = np.sum(y+_s)*x[i]
-            return _g
+        _num_samples = self._get_num_samples(X_train)
 
-        # TODO: is there a better way?
-        _num_features = self._convert_to_useful_data(X)[-1]
+        # Define / Initialize current tolerance value variable
+        _current_tol = 0
+        for _ in range(num_iterations):
+            # 1. Compute activation function at sample X[i] (sigmoid of <w,x>)
+            _s = self.activation_function(X_train)
 
-        # Initialize weights
-        self.weights = np.random.rand(_num_features) #np.zeros(_num_features) 
-        self.weights[-1] = self.bias
+            # Compute loss function at sample _X[i]
+            #_loss = np.sum( -y_train*np.log(_s) - (1-y_train)*np.log(1-_s) )
 
-        # Find weights by optimization of the loss function
-        self.weights = fmin_cg(
-                               f=_loss_function,
-                               x0=np.zeros(_num_features),
-                               fprime=_gradient_loss_function
-                               ).xopt
+            # 2. Compute gradient of loss function at sample X[i]
+            _g = (1 / _num_samples) * ( np.dot(X_train.T, (_s - y_train)) + self.regularization * self.weights )
+            _b = (1 / _num_samples) * np.sum(_s - y_train)
+
+            # 3. Update weights
+            self.weights -= self.learning_rate * _g
+            self.bias -= self.learning_rate * _b
+
+        # 4. Update current tolerance
+        _current_tol = 1/_num_samples * np.sum(np.abs(y_train - _s))
+
+        return _current_tol
