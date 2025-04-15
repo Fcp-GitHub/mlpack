@@ -6,13 +6,14 @@ import visualize as v
 from sklearn.datasets import load_digits
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score, classification_report, confusion_matrix
+from sklearn.preprocessing import StandardScaler
 
 def pprint(title: str):
     print()
     print(title.center(30))
     print('-'*30)
 
-def present(classifier1: dict, classifier2: dict):
+def present(classifier1: dict, classifier2: dict, standardization=True):
     """
     Demonstrate `classifier1` (sklearn classifier) and `classifier2` (fcp classifier) in order to compare them using the handwritten
     digits dataset that comes with the scikit-learn library.
@@ -26,9 +27,10 @@ def present(classifier1: dict, classifier2: dict):
         - Results visualization
 
     Parameters:
-    `classifier1` and `classifier2` must be two dictionaries containing (in order):
-        - `clf` : the actual classifier class, with methods `fit` and `predict`
-        - `name`: a string containing a user-friendly name of the classifier
+    - `classifier1` and `classifier2` must be two dictionaries containing (in order):
+        - `clf` : the actual classifier class, with methods `fit` and `predict`.
+        - `name`: a string containing a user-friendly name of the classifier.
+    - `standardization` : whether to perform data standardization or not.
     """
 
     # Validate input
@@ -50,6 +52,12 @@ def present(classifier1: dict, classifier2: dict):
             test_size=0.3, # 30 % of the total dataset is for testing
             random_state=42 # Seed of rnd generator in order to ensure reproducibility of the results
             )
+
+    # Data standardization, if required
+    if standardization:
+        sc = StandardScaler()
+        X_train = sc.fit_transform(X_train)
+        X_test  = sc.transform(X_test)
 
     # Train classifiers    
     c1.fit(X_train, y_train)
@@ -102,6 +110,10 @@ def present(classifier1: dict, classifier2: dict):
                 X_train, X_test, y_train, y_test = train_test_split(
                         X, y, test_size=i, random_state=42
                         )
+                if standardization:
+                    sc = StandardScaler()
+                    X_train = sc.fit_transform(X_train)
+                    X_test  = sc.transform(X_test)
                 clf.fit(X_train, y_train)
                 y_pred = clf.predict(X_test)
                 _res.append(1 - np.mean(y_pred == y_test))

@@ -3,7 +3,6 @@ import warnings
 import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.datasets import load_digits
-from sklearn.preprocessing import StandardScaler
 from concurrent.futures import ProcessPoolExecutor
 
 class Classifier(abc.ABC):
@@ -12,21 +11,21 @@ class Classifier(abc.ABC):
     """
     def __init__(self, bias, learning_rate, max_epochs, tolerance, warnings_on=False):
 
-        if (max_epochs is None) or (max_epochs <= 0) or (not isinstance(max_epochs, int)):
+        if (max_epochs is None) or (max_epochs <= 0) or (int(max_epochs) != max_epochs):
             raise ValueError(f'{self.__str__}: `max_epochs` must be a positive natural number.')
         if (tolerance is None) or (tolerance <= 0): 
            raise ValueError(f'{self.__str__}: `tolerance` must be a positive real number.')
 
         self.bias = bias
         self.learning_rate = learning_rate
-        self.max_epochs = max_epochs
+        self.max_epochs = int(max_epochs)
         self.tol = tolerance
         self.weights = None
         self.labels = None
         self.warnings_on = warnings_on
-
-        # Inizialize internal standard scaler
-        self.scaler = StandardScaler()
+        
+        # For multiclass classifiers
+        self.num_classes = None
 
     def _cc_data(self, X: np.ndarray, y: np.ndarray = None):
         """
@@ -77,18 +76,12 @@ class Classifier(abc.ABC):
         """
         return X.shape[-1]
 
-    #TODO: this method is not used.
-    #      It can be safely removed, unless I want to implement
-    #      a custom standard scaler class.
-    def _std_data(self, X: np.ndarray):
+    def _get_num_classes(self, y: np.ndarray):
         """
-        Data standardization method.
+        Get number of classes from the desired output of a training dataset.
         """
-        # Data standardization along `0`-th axis (per feature axis)
-        _mu = np.mean(X, axis=0)       # Get training data's PDF centroid
-        _std = np.std(X, axis=0)       # Get training data's PDF standard deviation
-        return (X - _mu) / (_std + 1e-8)    # Add small epsilon in order to avoid division by zero
-        
+        return len(np.unique(y))
+
     @abc.abstractmethod
     def activation_function(self, X: np.ndarray):
         pass
@@ -98,33 +91,60 @@ class Classifier(abc.ABC):
         pass 
 
     def predict(self, X: np.ndarray):
-        _X = self.scaler.transform(X)
-        return self._internal_predict(_X)
+        return self._internal_predict(X)
 
     @abc.abstractmethod
     def _internal_fit(self, X_train: np.ndarray, y_train: np.ndarray):
         pass
 
     def fit(self, X_train: np.ndarray, y_train: np.ndarray):
+
+        """ Preparation """
+
         # Input validation
         if not isinstance(y_train, np.ndarray):
             y_train = np.asarray(y_train)
 
-        # Initialize weights
-        self.weights = np.random.rand(self._get_num_features(X_train))
+        # Get number of classes
+        self.num_classes = self._get_num_classes(y_train)
 
-        # Standardize data
-        _X = self.scaler.fit_transform(X_train)
+        # Get number of features
+        _num_features = self._get_num_features(X_train)
+
+        # Initialize weights and bias based on the number of classes that are needed
+        if self.num_classes == 2:
+            self.weights = np.random.rand(_num_features)
+            # Bias already good
+        else:
+            self.weights = np.random.rand(_num_features, self.num_classes)
+            self.bias = np.full((1, self.num_classes), self.bias)
+
+        _y = y_train
+        if self.num_classes > 2:
+            # Convert labels to one-hot encoding in order to:
+            # 1. No false relationships between classes.
+            # 2. Easy comparison with probabilities.
+            # 3. Have clear targets while learning.
+            #TODO: might not be a really clear / readable solution
+            # Basically:
+            # Create an identity matrix of size `self.num_classes`x`self.num_classes`
+            # Flatten the `y_train` array
+            # Use the flattened `y_train` array as an array of indices for the identity matrix
+            # Store the specified rows in the `_y` array
+            _y = np.eye(self.num_classes)[y_train.reshape(-1)]
+
+        """ Learning Algorithm """
 
         # Initialize current tolerance
         _current_tol = np.inf
         # Loop through all epochs or until the desired tolerance is reached
         for _ in range(self.max_epochs):
             # Check if desired tolerance was reached
-            if _current_tol > self.tol:
+            #if _current_tol > self.tol:
+            if not np.all(_current_tol < self.tol):
                 # Loop through training data set using classifier-
                 # specific learning algorithm and get current tolerance value
-                _current_tol = self._internal_fit(_X, y_train)
+                _current_tol = self._internal_fit(X_train, _y)
             else:
                 return
 
@@ -169,10 +189,11 @@ class OneVsAll:
                 results[i] = future.result() # Get result
         return results
 
-    def _parallel_fit(self, classifier, fnargs):
+    def _parallel_fit(self, classifier : Classifier, fnargs):
         """
         Internal method for parallelization of fitting method.
         """
+        #print(f"{classifier} now running...")
         classifier.fit(*fnargs)     # Execute learning algorithm
         return classifier.weights   # Return updated weights
 
@@ -213,6 +234,9 @@ class OneVsAll:
         for clf,result in zip(self.cdict.values(), results):
             clf.weights = result
 
+    def activation_function(self, X: np.ndarray):
+        return np.array([clf.activation_function(X) for clf in self.cdict.values()]).T
+
     def predict(self, X):
         """
         Classify samples using One-Vs-Rest strategy.
@@ -221,39 +245,11 @@ class OneVsAll:
         if not isinstance(X, np.ndarray):
             X = np.asarray(X)
 
-        _is_vector = X.ndim == 1
-
-        # Confidence score: the highest will decide the prediction to be returned
-        highest_score = 0
         # Classify with each classifier and report the highest confidence score
-        # Distinguish between single-sample (vector) and multiple-samples (matrix)
-        # case
-        if _is_vector:
-            # VECTOR
-            # Best prediction based on confidence score
-            best_pred = 0
-            chosen_label = 0 
+        _prob = self.activation_function(X)
+        return np.argmax(_prob, axis=1)
 
-            for label,classifier in self.cdict.items():
-                #print(classifier)
-                new_score = classifier.activation_function(X)
-                if new_score > highest_score:
-                    highest_score = new_score
-                    chosen_label = label
-
-            return chosen_label
-
-        else:
-            # MATRIX
-            _num_samples = X.shape[0]
-            best_predictions = np.zeros(_num_samples)
-            
-            for i,sample in zip(range(0,_num_samples), X):
-                best_predictions[i] = self.predict(sample) 
-            
-            return best_predictions
-
-
+        
 class Perceptron(Classifier):
     def __init__(self, bias=0, learning_rate=0.3, max_epochs=1000, tolerance=1e-3, *args, **kwargs):
         """
@@ -278,7 +274,7 @@ class Perceptron(Classifier):
         ----------
         X: a monodimensional np.ndarray.
         """
-        _dot = np.dot(self.weights, X)
+        _dot = np.dot(X, self.weights)
         return _dot + self.bias
 
     def _internal_predict(self, X: np.ndarray):
@@ -299,28 +295,8 @@ class Perceptron(Classifier):
         Scalar or np.ndarray vector based on X's shape. As the original Perceptron
         algorithms, returns 0 ("no") or 1 ("yes") based on the classification result.
         """
-        # Get useful input information
-        _is_vector = self._is_vector(X)
-        _num_samples = self._get_num_samples(X)
-
-        # Classification algorithm
-        if _is_vector:
-            _act = self.activation_function(X)
-            return np.heaviside(_act, 0)
-        else:
-            # Declare / Initialize classifications' array
-            classification = np.zeros(_num_samples)
-            # For every sample: 
-            for i in range(_num_samples):
-                # Compute activation function: <w,x> + b
-                _act = self.activation_function(X[i])
-                # Compute Heaviside function
-                _class = np.heaviside(_act, 0)
-                # Append result
-                classification[i] = _class
-
-            return classification
-
+        _act = self.activation_function(X)
+        return np.heaviside(_act, 0)
 
     def _internal_fit(self, X_train: np.ndarray, y_train: np.ndarray):
         """
@@ -337,24 +313,19 @@ class Perceptron(Classifier):
         This algorithm is for BINARY CLASSIFICATION. Use the OneVsAll class for
         multiclass classification.
         """
-        _is_vector = self._is_vector(X_train)
         _num_samples = self._get_num_samples(X_train)
-        _num_features = self._get_num_features(X_train)
 
-        # Define / Initialize current tolerance value variable
-        _current_tol = 0
+        # 1. Compute predicted value
+        _y_hat = self._internal_predict(X_train)    #TODO: there might be a better solution
+        # 2. Update weigths accordingly 
+        self.weights += ( self.learning_rate / _num_samples ) * np.dot(X_train.T, (y_train - _y_hat))
+        self.bias    += ( self.learning_rate / _num_samples ) * np.sum(y_train - _y_hat)
 
-        # Loop through the training data set
-        for sample, y_des in zip(X_train, y_train):
-            # 1. Compute predicted value
-            _y_hat = self.predict(sample)
-            # 2. Update weigths accordingly 
-            self.weights += self.learning_rate * (y_des - _y_hat) * sample
-            self.bias += self.learning_rate * (y_des - _y_hat)
+        # 3. Update current tolerance
+        _current_tol = 1/_num_samples * np.sum(np.abs(y_train - _y_hat))
 
-            # 3. Update current tolerance
-            _current_tol += 1/_num_samples * np.abs(y_des - _y_hat)
         return _current_tol
+
 
 class LogisticRegression(Classifier):
     def __init__(self, bias=0, learning_rate=0.3, max_epochs=1000, tolerance=1e-3, regularization=1e-2, *args, **kwargs):
@@ -377,8 +348,11 @@ class LogisticRegression(Classifier):
         of the dot product of the weights and the sample.
         """
         z = np.dot(X, self.weights) + self.bias
-        _res = np.array([self.sigmoid(zi) for zi in z])
-        return _res
+        _res = None
+        if np.isscalar(z):
+            return self.sigmoid(z)
+        else:
+            return np.array([self.sigmoid(zi) for zi in z])
 
 
     def _internal_predict(self, X: np.ndarray):
@@ -418,6 +392,52 @@ class LogisticRegression(Classifier):
             self.bias -= self.learning_rate * _b
 
         # 4. Update current tolerance
+        _current_tol = 1/_num_samples * np.sum(np.abs(y_train - _s))
+
+        return _current_tol
+
+class SoftmaxRegression(Classifier):
+    def __init__(self, bias=0, learning_rate=0.3, max_epochs=1e3, tolerance=1e-3, regularization=1e-2, *args, **kwargs):
+        self.regularization = regularization
+        super().__init__(bias, learning_rate, max_epochs, tolerance, *args, **kwargs)
+
+    def softmax(self, z):
+        """
+        Softmax function applied to `z`.
+        """
+        _e = np.exp(z - np.max(z, axis=1, keepdims=True))   # Subtract max for numerical stability
+        return _e / np.sum(_e, axis=1, keepdims=True)
+
+    def activation_function(self, X: np.ndarray):
+        _dot = np.dot(X, self.weights) + self.bias
+        return self.softmax(_dot)
+
+    def _internal_predict(self, X: np.ndarray):
+        _prob = self.activation_function(X)
+        return np.argmax(_prob, axis=1)
+
+    def _internal_fit(self, X_train: np.ndarray, y_train: np.ndarray, num_iterations=100):
+        # NOTE: same as LogisticRegression's `_internal_fit`: GD is not the best algorithm
+        _num_samples = self._get_num_samples(X_train)
+
+        # Define / Initialize current tolerance value variable
+        _current_tol = 0
+        for _ in range(num_iterations):
+            # 1. Compute activation function
+            _s = self.activation_function(X_train)
+
+            # Compute loss function
+            # ...
+
+            # 2. Compute gradient of loss function
+            _g = (1 / _num_samples) * (np.dot(X_train.T, (_s - y_train)) + self.regularization * self.weights)
+            _b = (1 / _num_samples) * np.sum(_s - y_train, axis=0, keepdims=True)
+
+            # 3. Update weights
+            self.weights -= self.learning_rate * _g
+            self.bias = self.bias - self.learning_rate * _b
+
+        # 4. Update current tolerance 
         _current_tol = 1/_num_samples * np.sum(np.abs(y_train - _s))
 
         return _current_tol

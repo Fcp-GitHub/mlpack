@@ -15,31 +15,30 @@ from sklearn.model_selection import train_test_split
 import fcp
 import presentation as p
 
-## 1. Perceptron
-#classifier1 = {
-#        "clf"  : Perceptron(max_iter=100),
-#        "name" : "sklearn" 
-#}
-#
-#classifier2 = {
-#        "clf"  : fcp.OneVsAll(fcp.Perceptron,
-#                              args=[0, 0.3, 200, 1e-3]
-#                             ),
-#        "name" : "fcp (OVA)"
-#}
-#
-#p.present(classifier1, classifier2)
-#plt.show()
-#
+# 1. Perceptron
+classifier1 = {
+        "clf"  : Perceptron(max_iter=100),
+        "name" : "sklearn" 
+}
+
+classifier2 = {
+        "clf"  : fcp.OneVsAll(fcp.Perceptron),
+        "name" : "fcp (OVA)"
+}
+
+p.present(classifier1, classifier2, standardization=False)
+plt.show()
+
 # 2. Logistic Regression
 classifier1 = {
-        "clf"  : LogisticRegression(max_iter=100),
+        "clf"  : LogisticRegression(),
         "name" : "sklearn"
 }
 
 classifier2 = {
-        "clf"  : fcp.OneVsAll(fcp.LogisticRegression),
-        "name" : "fcp (OVA)"
+        #"clf"  : fcp.OneVsAll(fcp.LogisticRegression),
+        "clf"  : fcp.SoftmaxRegression(),
+        "name" : "fcp (SoftmaxRegression)"
 }
 
 p.present(classifier1, classifier2)
