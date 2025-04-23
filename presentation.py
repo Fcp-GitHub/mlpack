@@ -13,7 +13,7 @@ def pprint(title: str):
     print(title.center(30))
     print('-'*30)
 
-def present(classifier1: dict, classifier2: dict, standardization=True):
+def present(classifier1: dict, classifier2: dict, standardization=True, slow=False):
     """
     Demonstrate `classifier1` (sklearn classifier) and `classifier2` (fcp classifier) in order to compare them using the handwritten
     digits dataset that comes with the scikit-learn library.
@@ -54,10 +54,26 @@ def present(classifier1: dict, classifier2: dict, standardization=True):
             )
 
     # Data standardization, if required
+    sc = None
     if standardization:
         sc = StandardScaler()
         X_train = sc.fit_transform(X_train)
         X_test  = sc.transform(X_test)
+
+    # Get number of classes (10 in this case)
+    num_classes = len(np.unique(y))
+
+    # Convert labels to one-hot encoding in order to:
+    # 1. No false relationships between classes.
+    # 2. Easy comparison with probabilities.
+    # 3. Have clear targets while learning.
+    #TODO: might not be a really clear / readable solution
+    # Basically:
+    # Create an identity matrix of size `self.num_classes`x`self.num_classes`
+    # Flatten the `y_train` array
+    # Use the flattened `y_train` array as an array of indices for the identity matrix
+    # Store the specified rows in the `_y` array
+    #_y = np.eye(num_classes)[y_train.reshape(-1)]
 
     # Train classifiers    
     c1.fit(X_train, y_train)
@@ -106,14 +122,15 @@ def present(classifier1: dict, classifier2: dict, standardization=True):
         for i in heldout:
             print(f'Training {name} with {i}% heldout value')
             _res = []
-            for r in range(rounds):
+            for r in range(rounds if not slow else 1):
                 X_train, X_test, y_train, y_test = train_test_split(
                         X, y, test_size=i, random_state=42
                         )
                 if standardization:
-                    sc = StandardScaler()
-                    X_train = sc.fit_transform(X_train)
-                    X_test  = sc.transform(X_test)
+                    #TODO: This surely could be done better
+                    _sc = StandardScaler()
+                    X_train = _sc.fit_transform(X_train)
+                    X_test  = _sc.transform(X_test)
                 clf.fit(X_train, y_train)
                 y_pred = clf.predict(X_test)
                 _res.append(1 - np.mean(y_pred == y_test))
@@ -125,6 +142,8 @@ def present(classifier1: dict, classifier2: dict, standardization=True):
 
     # Results Visualization  
     pprint("RESULTS VISUALIZATION")
+    if standardization:
+        X_test = sc.inverse_transform(X_test)
     v.predictions_plot(X_test, pred1, y_test, title=name1)
     v.predictions_plot(X_test, pred2, y_test, title=name2)
 

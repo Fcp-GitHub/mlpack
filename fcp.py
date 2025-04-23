@@ -1,8 +1,12 @@
 import abc
 import warnings
 import numpy as np
+import copy
+from scipy.optimize import minimize, Bounds
+from scipy.spatial import distance
+from cvxopt import matrix as cvxopt_matrix
+from cvxopt import solvers as cvxopt_solvers
 import matplotlib.pyplot as plt
-from sklearn.datasets import load_digits
 from concurrent.futures import ProcessPoolExecutor
 
 class Classifier(abc.ABC):
@@ -17,7 +21,7 @@ class Classifier(abc.ABC):
            raise ValueError(f'{self.__str__}: `tolerance` must be a positive real number.')
 
         self.bias = bias
-        self.learning_rate = learning_rate
+        self.eta = learning_rate
         self.max_epochs = int(max_epochs)
         self.tol = tolerance
         self.weights = None
@@ -91,6 +95,8 @@ class Classifier(abc.ABC):
         pass 
 
     def predict(self, X: np.ndarray):
+        if self.weights is None or self.bias is None:
+                raise RuntimeError("Model not trained yet. Call `fit()` first.") 
         return self._internal_predict(X)
 
     @abc.abstractmethod
@@ -121,16 +127,16 @@ class Classifier(abc.ABC):
 
         _y = y_train
         if self.num_classes > 2:
-            # Convert labels to one-hot encoding in order to:
-            # 1. No false relationships between classes.
-            # 2. Easy comparison with probabilities.
-            # 3. Have clear targets while learning.
-            #TODO: might not be a really clear / readable solution
-            # Basically:
-            # Create an identity matrix of size `self.num_classes`x`self.num_classes`
-            # Flatten the `y_train` array
-            # Use the flattened `y_train` array as an array of indices for the identity matrix
-            # Store the specified rows in the `_y` array
+        #    # Convert labels to one-hot encoding in order to:
+        #    # 1. No false relationships between classes.
+        #    # 2. Easy comparison with probabilities.
+        #    # 3. Have clear targets while learning.
+        #    #TODO: might not be a really clear / readable solution
+        #    # Basically:
+        #    # Create an identity matrix of size `self.num_classes`x`self.num_classes`
+        #    # Flatten the `y_train` array
+        #    # Use the flattened `y_train` array as an array of indices for the identity matrix
+        #    # Store the specified rows in the `_y` array
             _y = np.eye(self.num_classes)[y_train.reshape(-1)]
 
         """ Learning Algorithm """
@@ -161,10 +167,12 @@ class OneVsAll:
     The 'OneVsAll' class uses 'concurrent.futures.ProcessPoolExecutor'
     (added with python 3.2) in order to speed up execution via multiprocessing.
     """
-    def __init__(self, classifier: Classifier, args=None):
+    def __init__(self, classifier: Classifier, args=None, svm_labels=False, workers=None):
         self.classifier = classifier
         self.classifier_args = args
         self.cdict = None
+        self.svm_labels = svm_labels
+        self.workers = workers
 
     def _run_cpu_tasks_in_parallel(self, tasks, fnargs):
         """
@@ -181,11 +189,11 @@ class OneVsAll:
         Returns the list of return values if the tasks have one, otherwise a list 
         of `None` is returned.
         """
-        with ProcessPoolExecutor() as executor:
+        with ProcessPoolExecutor(max_workers=self.workers) as executor:
             # Submit all tasks for parallel execution
             futures = [executor.submit(task,*fnarg) for task,fnarg in zip(tasks,fnargs)]
             results = [None]*len(futures)
-            for i,future in zip(range(len(futures)), futures):
+            for i, future in enumerate(futures):
                 results[i] = future.result() # Get result
         return results
 
@@ -195,7 +203,7 @@ class OneVsAll:
         """
         #print(f"{classifier} now running...")
         classifier.fit(*fnargs)     # Execute learning algorithm
-        return classifier.weights   # Return updated weights
+        return classifier.weights, classifier.bias   # Return updated weights
 
     def fit(self, X_train: np.ndarray, y_train: np.ndarray):
         """
@@ -225,14 +233,15 @@ class OneVsAll:
         # Iterate through all the different classes and save function
         # arguments for later
         for i,(label,clf) in zip(range(num_classifiers), self.cdict.items()):
-            new_y_train = np.where(y_train == label, 1, 0) 
+            new_y_train = np.where(y_train == label, 1, 0 if not self.svm_labels else -1) 
             fnargs[i] = [clf, [X_train, new_y_train]]
             tasks[i]  = self._parallel_fit
         
         # Run learning algorithm for all classifiers (hopefully) concurrently
+        #print("Running tasks...")
         results = self._run_cpu_tasks_in_parallel(tasks, fnargs)
         for clf,result in zip(self.cdict.values(), results):
-            clf.weights = result
+            clf.weights, clf.bias = result
 
     def activation_function(self, X: np.ndarray):
         return np.array([clf.activation_function(X) for clf in self.cdict.values()]).T
@@ -274,8 +283,7 @@ class Perceptron(Classifier):
         ----------
         X: a monodimensional np.ndarray.
         """
-        _dot = np.dot(X, self.weights)
-        return _dot + self.bias
+        return np.dot(X, self.weights) + self.bias
 
     def _internal_predict(self, X: np.ndarray):
         """
@@ -318,8 +326,8 @@ class Perceptron(Classifier):
         # 1. Compute predicted value
         _y_hat = self._internal_predict(X_train)    #TODO: there might be a better solution
         # 2. Update weigths accordingly 
-        self.weights += ( self.learning_rate / _num_samples ) * np.dot(X_train.T, (y_train - _y_hat))
-        self.bias    += ( self.learning_rate / _num_samples ) * np.sum(y_train - _y_hat)
+        self.weights += ( self.eta / _num_samples ) * np.dot(X_train.T, (y_train - _y_hat))
+        self.bias    += ( self.eta / _num_samples ) * np.sum(y_train - _y_hat)
 
         # 3. Update current tolerance
         _current_tol = 1/_num_samples * np.sum(np.abs(y_train - _y_hat))
@@ -364,7 +372,7 @@ class LogisticRegression(Classifier):
         return _pred
 
 
-    def _internal_fit(self, X_train, y_train, num_iterations=100):
+    def _internal_fit(self, X_train, y_train, num_iterations=50):
         """Logistic regression's learning algorithm.
         Learning is performed using the cross-entropy loss function.
         """
@@ -388,8 +396,8 @@ class LogisticRegression(Classifier):
             _b = (1 / _num_samples) * np.sum(_s - y_train)
 
             # 3. Update weights
-            self.weights -= self.learning_rate * _g
-            self.bias -= self.learning_rate * _b
+            self.weights -= self.eta * _g
+            self.bias -= self.eta * _b
 
         # 4. Update current tolerance
         _current_tol = 1/_num_samples * np.sum(np.abs(y_train - _s))
@@ -397,7 +405,7 @@ class LogisticRegression(Classifier):
         return _current_tol
 
 class SoftmaxRegression(Classifier):
-    def __init__(self, bias=0, learning_rate=0.3, max_epochs=1e3, tolerance=1e-3, regularization=1e-2, *args, **kwargs):
+    def __init__(self, bias=0, learning_rate=0.3, max_epochs=1000, tolerance=1e-3, regularization=1e-2, *args, **kwargs):
         self.regularization = regularization
         super().__init__(bias, learning_rate, max_epochs, tolerance, *args, **kwargs)
 
@@ -416,7 +424,7 @@ class SoftmaxRegression(Classifier):
         _prob = self.activation_function(X)
         return np.argmax(_prob, axis=1)
 
-    def _internal_fit(self, X_train: np.ndarray, y_train: np.ndarray, num_iterations=100):
+    def _internal_fit(self, X_train: np.ndarray, y_train: np.ndarray, num_iterations=50):
         # NOTE: same as LogisticRegression's `_internal_fit`: GD is not the best algorithm
         _num_samples = self._get_num_samples(X_train)
 
@@ -426,7 +434,7 @@ class SoftmaxRegression(Classifier):
             # 1. Compute activation function
             _s = self.activation_function(X_train)
 
-            # Compute loss function
+            #TODO: Compute loss function
             # ...
 
             # 2. Compute gradient of loss function
@@ -434,10 +442,441 @@ class SoftmaxRegression(Classifier):
             _b = (1 / _num_samples) * np.sum(_s - y_train, axis=0, keepdims=True)
 
             # 3. Update weights
-            self.weights -= self.learning_rate * _g
-            self.bias = self.bias - self.learning_rate * _b
+            self.weights -= self.eta * _g
+            self.bias = self.bias - self.eta * _b
 
         # 4. Update current tolerance 
         _current_tol = 1/_num_samples * np.sum(np.abs(y_train - _s))
 
         return _current_tol
+
+class SVM(Classifier):
+    def __init__(self, bias=0, learning_rate=0.3, max_epochs=1000, tolerance=1e-3, support_vectors_tol=1e-11, regularization=1, *args, **kwargs):
+        super().__init__(bias, learning_rate, 1, tolerance, *args, **kwargs)
+        self.lmul = None    # Lagrange multipliers
+        self.is_sv = None
+        self.sv_i = None    # Support vectors' indices
+        self.sv_tol = support_vectors_tol   # Tolerance used to identify support vectors
+        self.regularization = regularization
+
+        self.Xt, self.yt = None, None
+
+    def activation_function(self, X: np.ndarray):
+        return self.kernel(X, self.weights) + self.bias
+
+    @abc.abstractclassmethod
+    def kernel(self, xi, xj):
+        pass
+
+    @abc.abstractclassmethod
+    def gram(self, X: np.ndarray):
+        pass
+
+    def dual(self, l: np.ndarray, K: np.ndarray, y: np.ndarray):
+        ly = l * y
+        return l.sum() - 0.5 * np.dot(ly.T, np.dot(K,ly)) 
+
+    def dual_gradient(self, l: np.ndarray, K: np.ndarray, y: np.ndarray):
+        """Calculates the gradient of the dual objective function."""
+        return np.ones_like(l) - np.dot(K, l * y) * y
+
+    def _internal_predict(self, X: np.ndarray):
+        #_act = self.activation_function(X)
+        #return np.sign(_act)
+        xs, ys = self.Xt[self.sv_i, np.newaxis], self.yt[self.sv_i]
+        # Support vectors
+        l, y, _X = self.lmul[self.is_sv], self.yt[self.is_sv], self.Xt[self.is_sv]
+        # Compute bias
+        self.bias = ys - np.sum(l * y * self.kernel(_X, xs), axis=0)
+        # Compute score
+        score = np.sum(l * y * self.kernel(_X, X), axis=0)
+        return np.sign(score).astype(int), score
+        
+
+    def _internal_fit_scipy(self, X_train: np.ndarray, y_train: np.ndarray):
+        #TODO: for now the solution is given only solving the dual problem. There should be a parameter to choose if either the primal or the dual has to be solved.
+        _num_samples = self._get_num_samples(X_train)
+
+        # Define initial parameters for the Lagrange multipliers
+        l0 = np.random.rand(_num_samples) * 0.1#np.zeros(_num_samples)
+
+        # Compute kernel
+        K = self.gram(X_train)
+
+        # Define constraint 
+        eq_cons = {
+                'type' : 'eq',
+                'fun'  : lambda l : np.dot(l, y_train)
+        }
+
+        # Define bounds for the Lagrange multipliers
+        bounds = Bounds(0, self.regularization)
+
+        # Call scipy optimization routine
+        #print("Minimize!")
+        res = minimize(
+                fun = lambda l : -self.dual(l, K, y_train),
+                jac = lambda l : -self.dual_gradient(l, K, y_train),
+                x0 = l0,
+                method = 'SLSQP',
+                constraints = eq_cons,
+                bounds = bounds,
+                options={'maxiter': 1000, 'ftol': 1e-6}
+        )
+        #print("Minimized")
+
+        # Check for algorithm success
+        if not res.success:
+            raise RuntimeError(f"Optimization failed: {res.message}")
+
+        # Save estimated parameters
+        self.lmul = res.x
+
+        # Compute weights
+        # First, identify support vectors (values with non-zero Lagrange multiplier)
+        self.sv_i = np.where(self.lmul > self.sv_tol)[0]
+        _sl = self.lmul[self.sv_i]
+        _sv = X_train[self.sv_i]
+        _sy = y_train[self.sv_i]
+        
+        self.weights = np.sum(
+                _sl[:, np.newaxis] *
+                _sy[:, np.newaxis] *
+                _sv, axis=0)
+
+        # Compute the actual weights and the bias
+        self.bias = _sy - np.dot(_sv, self.weights)
+        self.bias = np.mean(self.bias)
+
+        _p = self.predict(X_train)
+
+        return 1/_num_samples * np.sum(np.abs(y_train - _p))
+
+    def _internal_fit(self, X_train: np.ndarray, y_train: np.ndarray):
+        _num_samples = self._get_num_samples(X_train)
+
+        # Initialize values and compute matrix H
+        _y = y_train.reshape(-1, 1).astype(np.double)   # Has to be a column vector
+        self.yt = _y
+        self.Xt = X_train
+        K = self.gram(X_train)
+
+        # Convert into cvxopt format
+        # 0.5 * x^T P x + q^T x
+        P = cvxopt_matrix(_y @ _y.T * K)
+        q = cvxopt_matrix(-np.ones((_num_samples,1)))
+
+        # Gx <= h
+        #G = cvxopt_matrix(-np.eye(_num_samples))
+        G = cvxopt_matrix(np.vstack((-np.identity(_num_samples),np.identity(_num_samples))))
+        #h = cvxopt_matrix(np.zeros(_num_samples))
+        h = cvxopt_matrix(np.vstack((np.zeros((_num_samples,1)), np.ones((_num_samples,1)) * self.regularization)))
+
+        # Ax = b
+        A = cvxopt_matrix(_y.T)
+        b = cvxopt_matrix(np.zeros(1))
+
+        # Set optimizer parameters
+        cvxopt_solvers.options['show_progress'] = False
+        #cvxopt_solvers.options['abstol'] = 1e-10
+        #cvxopt_solvers.options['reltol'] = 1e-10
+        #cvxopt_solvers.options['feastol'] = 1e-10
+
+        # Run solver and store results
+        #print("Minimize!")
+        sol = cvxopt_solvers.qp(P, q, G, h, A, b)
+        #print("Minimized")
+        self.lmul = np.array(sol['x'])
+
+        # Get boolean array that flags support vectors
+        self.is_sv = ((self.lmul > self.sv_tol)&(self.lmul <= self.regularization)).squeeze()
+        # Get indices of some support vectors
+        self.sv_i = np.argmax((self.lmul > self.sv_tol)&(self.lmul <= self.regularization - self.sv_tol))
+
+        # Compute weights 
+        #self.weights = ((_y[self.sv_i] * self.lmul[self.sv_i]).T @ X_train[self.sv_i]).reshape(-1,1)
+
+        # Compute bias
+        #self.bias = _y[self.sv_i] - np.dot(X_train[self.sv_i], self.weights)
+        #self.bias = self.bias[0]
+
+        _p = self.predict(X_train)
+
+        return 1/_num_samples * np.sum(np.abs(y_train - _p))
+
+
+class LinearSVM(SVM):
+    def kernel(self, xi, xj):
+        return xi @ xj.T
+
+    def gram(self, X: np.ndarray):
+        return X @ X.T
+
+class GaussSVM(SVM):
+    def __init__(self, rbf=0.5, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.rbf = rbf
+
+    def kernel(self, xi, xj):
+        #return np.exp(-self.rbf * np.abs(xi - xj)**2)
+        return np.exp(-self.rbf * distance.cdist(xi, xj, 'sqeuclidean'))
+
+    def gram(self, X: np.ndarray):
+        #_dist = np.sum( (X[:, np.newaxis, :] - X[np.newaxis, :, :]) ** 2, axis = 2)
+        #return np.exp(-self.rbf * _dist)
+        return np.exp(-self.rbf * distance.cdist(X, X, 'sqeuclidean'))
+
+class MultiSVM:
+    def __init__(self, clf: SVM, *args, **kwargs):
+        self.clf = clf
+        self.clfs = []
+        self.args = args
+        self.kwargs = kwargs
+        self.nclasses = 0
+
+    def _task(self, X_train, y_train, i):
+        # Get data for the pair
+        Xs, Ys = X_train, copy.copy(y_train)
+        # Change labels for multiclass classification
+        Ys[Ys != i], Ys[Ys == i] = -1, +1
+        # Fit
+        clf = self.clf(*self.args, **self.kwargs)
+        clf.fit(Xs, Ys)
+
+        # Save classifier
+        self.clfs.append(clf)
+
+    def fit(self, X_train: np.ndarray, y_train: np.ndarray):
+        self.clfs = []
+        self.nclasses = len(np.unique(y_train))
+
+        for i in range(self.nclasses):
+            # Get data for the pair
+            Xs, Ys = X_train, copy.copy(y_train)
+            # Change labels for multiclass classification
+            Ys[Ys != i], Ys[Ys == i] = -1, +1
+            # Fit
+            clf = self.clf(*self.args, **self.kwargs)
+            print(f"fit {i}", end='\r')
+            clf.fit(Xs, Ys)
+
+            # Save classifier
+            self.clfs.append(clf)
+
+    def predict(self, X: np.ndarray):
+        _num_samples = X.shape[0]
+        _preds = np.zeros((_num_samples, self.nclasses))
+        
+        for i, clf in enumerate(self.clfs):
+            _, _preds[:, i] = clf.predict(X)
+
+        return np.argmax(_preds, axis=1)
+
+class MultiLayerPerceptron:
+    def __init__(self, input_size, hidden_size, output_size):
+        self.weights_input_hidden = np.random.randn(input_size, hidden_size)
+        self.weights_hidden_output = np.random.randn(hidden_size, output_size)
+        self.bias_hidden = np.zeros((1, hidden_size))
+        self.bias_output = np.zeros((1, output_size))
+
+    def sigmoid(self, z):
+        return 1 / (1 + np.exp(-z))
+
+    def softmax(self, x):
+        z = np.exp(x - np.max(x))
+        return z / z.sum(axis=1, keepdims=True)
+
+    def forward(self, X: np.ndarray):
+        self.hidden_input = np.dot(X, self.weights_input_hidden) + self.bias_hidden
+        self.hidden_output = self.sigmoid(self.hidden_input)
+
+        self.final_input = np.dot(self.hidden_output, self.weights_hidden_output) + self.bias_output
+        self.final_output = self.softmax(self.final_input)
+
+        return self.final_output
+
+    def backward(self, X: np.ndarray, y: np.ndarray, output: np.ndarray, learning_rate):
+        output_error = output - y
+        hidden_error = np.dot(output_error, self.weights_hidden_output.T) * self.hidden_output * (1 - self.hidden_output)
+        
+        self.weights_hidden_output -= learning_rate * np.dot(self.hidden_output.T, output_error)
+        self.bias_output -= learning_rate * np.sum(output_error, axis=0, keepdims=True)
+        self.weights_input_hidden -= learning_rate * np.dot(X.T, hidden_error)
+        self.bias_hidden -= learning_rate * np.sum(hidden_error, axis=0, keepdims=True)
+
+    def fit(self, X_train: np.ndarray, y_train: np.ndarray, max_epochs, learning_rate):
+        for _ in range(max_epochs):
+            output = self.forward(X_train)
+            self.backward(X_train, y_train, output, learning_rate)
+
+    def predict(self, X: np.ndarray):
+        output = self.forward(X)
+        return np.argmax(output, axis=1)
+
+class Neural_Network:
+    def __init__(self, n_in, n_hidden, n_out, max_epochs=100, learning_rate=1.2):
+        # Network dimensions
+        self.n_x = n_in
+        self.n_h = n_hidden
+        self.n_y = n_out
+
+        self.max_epochs = max_epochs
+        self.eta = learning_rate
+        
+        # Parameters initialization
+        self.W1 = np.random.randn(self.n_h, self.n_x) * 0.01
+        self.b1 = np.zeros((self.n_h, 1))
+        self.W2 = np.random.randn(self.n_y, self.n_h) * 0.01
+        self.b2 = np.zeros((self.n_y, 1))
+    
+    def sigmoid(self, z):
+        """
+        Sigmoid function applied to `z`.
+        """
+        #if z >= 0:
+        return 1 / (1 + np.exp(-z))
+        #else:
+        #    return np.exp(z) / (1 + np.exp(z))
+
+
+    def forward(self, X):
+        """ Forward computation """
+        self.Z1 = self.W1.dot(X.T) + self.b1
+        self.A1 = np.tanh(self.Z1)
+        self.Z2 = self.W2.dot(self.A1) + self.b2
+        self.A2 = self.sigmoid(self.Z2)
+    
+    def back_prop(self,  X, Y):
+        """ Back-progagate gradient of the loss """
+        m = X.shape[0]
+        self.dZ2 = self.A2 - Y
+        self.dW2 = (1 / m) * np.dot(self.dZ2, self.A1.T)
+        self.db2 = (1 / m) * np.sum(self.dZ2, axis=1, keepdims=True)
+        self.dZ1 = np.multiply(np.dot(self.W2.T, self.dZ2), 1 - np.power(self.A1, 2))
+        self.dW1 = (1 / m) * np.dot(self.dZ1, X)
+        self.db1 = (1 / m) * np.sum(self.dZ1, axis=1, keepdims=True)
+
+    def fit(self, X, Y):
+        """ Complete process of learning, alternates forward pass,
+            backward pass and parameters update """
+        m = X.shape[0]
+        for _ in range(self.max_epochs):
+            self.forward(X)
+            #loss = -np.sum(np.multiply(np.log(self.A2), Y) + np.multiply(np.log(1-self.A2),  (1 - Y))) / m
+            self.back_prop(X, Y)
+
+            self.W1 -= self.eta * self.dW1
+            self.b1 -= self.eta * self.db1
+            self.W2 -= self.eta * self.dW2
+            self.b2 -= self.eta * self.db2
+
+            #if e % 1000 == 0:
+            #    print("Loss ",  e, " = ", loss)
+
+    def predict(self, X):
+        """ Compute predictions with just a forward pass """
+        self.forward(X)
+        return np.round(self.A2).astype(int)
+
+#from sklearn.datasets import load_digits
+#from sklearn.model_selection import train_test_split
+#from sklearn.preprocessing import StandardScaler
+#from sklearn.metrics import accuracy_score
+ 
+class MLP:
+    def __init__(self, input_size, hidden_size, output_size, learning_rate=0.01, epochs=100, batch_size=32):
+        self.input_size = input_size
+        self.hidden_size = hidden_size
+        self.output_size = output_size
+
+        self.eta = learning_rate
+        self.epochs = epochs
+
+        self.batch_size = batch_size
+
+        # Weights for the input - hidden layer step
+        self.weights_hidden = np.random.randn(input_size, hidden_size) * 0.01
+        self.bias_hidden = np.zeros((1, hidden_size))
+
+        # Weights for the hidden layer - output step
+        self.weights_output = np.random.randn(hidden_size, output_size) * 0.01
+        self.bias_output = np.zeros((1, output_size))
+
+    def sigmoid(self, x):
+        return 1 / (1 + np.exp(-x))
+
+    def sigmoid_derivative(self, x):
+        return x * (1 - x)
+
+    def softmax(self, x):
+        z = np.exp(x - np.max(x, axis=1, keepdims=True))
+        return z / np.sum(z, axis=1, keepdims=True)
+
+    def forward(self, X):
+        # Compute hidden layer step
+        self.hidden_layer_input = np.dot(X, self.weights_hidden) + self.bias_hidden
+        self.hidden_layer_output = self.sigmoid(self.hidden_layer_input)
+
+        # Compute output layer step
+        self.output_layer_input = np.dot(self.hidden_layer_output, self.weights_output) + self.bias_output
+        self.output_layer_output = self.softmax(self.output_layer_input)
+
+        # Return output
+        return self.output_layer_output
+
+    def backward(self, X, y, output):
+        num_samples = X.shape[0]
+
+        # Gradient of the loss function with respect to the output layer
+        d_output = output - y
+
+        # Gradient of the output layer weights and biases
+        d_weights_output = np.dot(self.hidden_layer_output.T, d_output) / num_samples
+        d_bias_output = np.sum(d_output, axis=0, keepdims=True) / num_samples
+
+        # Gradient of the hidden layer
+        d_hidden = np.dot(d_output, self.weights_output.T) * self.sigmoid_derivative(self.hidden_layer_output)
+
+        # Gradient of the hidden layer weights and biases
+        d_weights_hidden = np.dot(X.T, d_hidden) / num_samples
+        d_bias_hidden = np.sum(d_hidden, axis=0, keepdims=True) / num_samples
+
+        return d_weights_hidden, d_bias_hidden, d_weights_output, d_bias_output
+
+    def update_parameters(self, d_weights_hidden, d_bias_hidden, d_weights_output, d_bias_output):
+        self.weights_hidden -= self.eta * d_weights_hidden
+        self.bias_hidden -= self.eta * d_bias_hidden
+        self.weights_output -= self.eta * d_weights_output
+        self.bias_output -= self.eta * d_bias_output
+
+    def fit(self, X_train, y_train):
+        num_classes = len(np.unique(y_train))
+        y_train = np.eye(num_classes)[y_train.reshape(-1)]
+        num_samples = X_train.shape[0]
+        num_batches = num_samples // self.batch_size
+
+        for _ in range(self.epochs):
+            permutation = np.random.permutation(num_samples)
+            X_shuffled = X_train[permutation]
+            y_shuffled = y_train[permutation]
+
+            for i in range(0, num_samples, num_batches):
+                #start = i * self.batch_size
+                #end = (i + 1) * self.batch_size
+                X_batch = X_shuffled[i:i+num_batches]#start:end]
+                y_batch = y_shuffled[i:i+num_batches]#start:end]
+
+                output = self.forward(X_batch)
+                d_wh, d_bh, d_wo, d_bo = self.backward(X_batch, y_batch, output)
+                self.update_parameters(d_wh, d_bh, d_wo, d_bo)
+
+            #if (epoch + 1) % 10 == 0:
+            #    output_train = self.forward(X_train)
+            #    predictions_train = np.argmax(output_train, axis=1)
+            #    accuracy_train = accuracy_score(np.argmax(y_train, axis=1), predictions_train)
+            #    print(f"Epoch {epoch+1}/{self.epochs}, Training Accuracy: {accuracy_train:.4f}")
+
+    def predict(self, X):
+        output = self.forward(X)
+        predictions = np.argmax(output, axis=1)
+        return predictions
