@@ -1,7 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
-import fcp
-import visualize as v
+import mlpack.visualize as v
 
 from sklearn.datasets import load_digits
 from sklearn.model_selection import train_test_split

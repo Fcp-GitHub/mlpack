@@ -1,0 +1,15 @@
+README.md
+setup.py
+mlpack/__init__.py
+mlpack/classifier.py
+mlpack/logistic_regression.py
+mlpack/mlp.py
+mlpack/ova.py
+mlpack/perceptron.py
+mlpack/presentation.py
+mlpack/svm.py
+mlpack/visualize.py
+mlpack.egg-info/PKG-INFO
+mlpack.egg-info/SOURCES.txt
+mlpack.egg-info/dependency_links.txt
+mlpack.egg-info/top_level.txt

@@ -9,7 +9,7 @@ from sklearn.metrics import accuracy_score              # compute accuracy of th
 from sklearn.metrics import classification_report       # classification metrics
 from sklearn.metrics import confusion_matrix
 
-import fcp  # For OneVsAll and Perceptron
+from mlpack import ova as OVA, perceptron  # For OneVsAll and Perceptron
 
 # Load dataset as a (data, target) tuple of two ndarrays:
 #   data:   contains a 2D ndarray of shape (1797,64) with each row
@@ -25,7 +25,7 @@ X_train, X_test, y_train, y_test = train_test_split(X, y,
                                                     )   
 
 # Perceptron classifier
-ova = fcp.OneVsAll(fcp.Perceptron, args=[0,0.1,100,1e-3])
+ova = OVA.OneVsAll(perceptron.Perceptron, args=[0,0.1,100,1e-3])
 perceptron = Perceptron(max_iter=100,       # Maximum number of epochs
                         eta0=0.1,           # Learning rate
                         random_state=42     # Seed of random number generator
