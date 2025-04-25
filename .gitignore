@@ -1,1 +1,5 @@
-__pycache__
+# Python cache files
+__pycache__/*
+
+# Packaging files
+mlpack.egg-info/*

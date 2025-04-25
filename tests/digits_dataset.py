@@ -6,8 +6,8 @@ import numpy as np
 
 from matplotlib import pyplot as plt
 
-import fcp
-import visualize as v
+from mlpack import ova as OVA, perceptron
+import mlpack.visualize as v
 
 digits = load_digits()
 
@@ -21,11 +21,13 @@ pca.fit_transform(digits.data)
 plt.scatter(proj[:, 0], proj[:, 1], c=digits.target, cmap="Paired")
 plt.colorbar()
 
+plt.show()
+
 X_train, X_test, y_train, y_test = train_test_split(digits.data, digits.target, test_size=0.2)
 
-ova = fcp.OneVsAll(fcp.Perceptron, args=[0, 0.1, 10, 1e-3])
-ova.train(X_train, y_train)
-y_pred = ova.classify(X_test)
+ova = OVA.OneVsAll(perceptron.Perceptron)
+ova.fit(X_train, y_train)
+y_pred = ova.predict(X_test)
 y_exp  = y_test
 
 

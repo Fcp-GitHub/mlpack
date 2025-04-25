@@ -12,8 +12,8 @@ from sklearn.svm import (
 from sklearn.neural_network import MLPClassifier
 from sklearn.model_selection import train_test_split
 
-import fcp
-import presentation as p
+from mlpack import ova, perceptron, mlp, logistic_regression, svm
+import mlpack.presentation as p
 
 # 1. Perceptron
 p.pprint("Single-Layer Perceptron")
@@ -23,7 +23,7 @@ classifier1 = {
 }
 
 classifier2 = {
-        "clf"  : fcp.OneVsAll(fcp.Perceptron),
+        "clf"  : ova.OneVsAll(perceptron.Perceptron),
         "name" : "fcp (OVA)"
 }
 
@@ -39,7 +39,7 @@ classifier1 = {
 
 classifier2 = {
         #"clf"  : fcp.OneVsAll(fcp.LogisticRegression),
-        "clf"  : fcp.SoftmaxRegression(max_epochs=50),
+        "clf"  : logistic_regression.SoftmaxRegression(max_epochs=50),
         "name" : "fcp (SoftmaxRegression)"
 }
 
@@ -54,7 +54,7 @@ classifier1 = {
 }
 
 classifier2 = {
-        "clf"  : fcp.MultiSVM(fcp.LinearSVM, max_epochs=1),
+        "clf"  : svm.MultiSVM(svm.LinearSVM, max_epochs=1),
         "name" : "fcp (OVA)"
 }
 
@@ -69,7 +69,7 @@ classifier1 = {
 }
 
 classifier2 = {
-        "clf"  : fcp.MultiSVM(fcp.GaussSVM, max_epochs=1),
+        "clf"  : svm.MultiSVM(svm.GaussSVM, max_epochs=1),
         "name" : "fcp (OVA)"
 }
 
@@ -84,7 +84,7 @@ classifier1 = {
 }
 
 classifier2 = {
-        "clf"  : fcp.MLP(64, 128, 10, learning_rate=0.3, epochs=200),
+        "clf"  : mlp.MLP(64, 128, 10, learning_rate=0.3, epochs=200),
         "name" : "fcp (MLP)"
 }
 

@@ -3,7 +3,8 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import classification_report, confusion_matrix
 from sklearn.svm import LinearSVC
-import fcp
+
+from mlpack.mlp import Neural_Network
 
 X, y = load_breast_cancer(return_X_y=True)
 #y[y == 0] = -1
@@ -17,11 +18,11 @@ X_test = sc.transform(X_test)
 #lg = fcp.Perceptron()
 #lg = fcp.LinearSVM(max_epochs=1, regularization=1)
 #lg = LinearSVC()
-lg = fcp.Neural_Network(30, 10, 1)
+lg = Neural_Network(30, 10, 1, 10, 0.3)
 
-lg.train(X_train, y_train, 10, 0.3)
+lg.fit(X_train, y_train)
 
-pred = lg.predict(X_test)
+pred = lg.predict(X_test)[0]
 print(pred)
 
 class_report = classification_report(y_test, pred)
