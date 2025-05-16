@@ -1,0 +1,110 @@
+> Abstract Base Class that gives the basic traits for all 
+> the models of the class. It should provide just enough to 
+> group everything up here and give common basic 
+> functionalities
+
+Model(ABC):
+    self.
+        warnings_on
+        labels
+        num_classes
+
+    __init__(warnings_on)
+
+    _check_samples(X) -> None
+    _check_targets(y) -> None
+
+    _is_vector(X) -> bool
+    _get_num_samples(X) -> int
+    _get_num_features(X) -> int
+    _get_num_classes(y) -> int
+
+    _get_one_hot(y) -> ndarray(num_samples)
+    
+    __str__() = 0
+    __repr__() = 0
+
+
+> Abstract Base Class for all linear classifiers
+
+LinearClassifier(ABC, Model):  
+    self.
+        weights
+        bias
+        learning_rate
+        patience    = max number of epochs
+        tolerance
+        loss    ndarray of loss values over iterations/epochs
+        score   ndarray of score values over iterations/epochs
+        
+    __init__(bias, learning_rate, patience, tolerance)
+
+>   Interface methods that handle the input and pass it to the
+>   right algorithm, then check the output and send it to 
+>   the caller:
+
+>   Metrics: F1-Score
+>   Convergence Condition: 1-(F1-Score) < self.tolerance
+>   ! Look for K-Folding and Cross-Validation !
+>   Different levels of verbosity for `verbose` and `animate`
+
+    fit(X, y, verbose=False, animate=False) -> self:
+        # Check input data
+        # If multiclass -> one-hot encoding
+        # Dispatch based on binary or multiclass classification
+        # Initialize weights and bias
+        # If animate == True initialize animation(s) ?
+        for _ in (self.patience):
+            # Shuffle training data X
+            # Call _internal_fit()
+            # Save loss and F1-Score
+            (# Save params only if current loss is less than previous one)
+            # If verbose == True show loss and metrics
+            # If animate == True update plot(s) ?
+            # If convergence condition has not been reached, continue
+
+    predict(X, animate=False) -> ndarray(n_samples,):
+        # Check if weights and bias are not None
+        # If animate == True plot classification animation
+        # Call _internal_predict()
+
+>   Internal virtual methods that need to be overridden for 
+>   each model
+    loss_function(X) = 0 -> ndarray(n_samples,)
+    activation_function(X) = 0 -> ndarray(n_samples, n_classes)
+    _fit(X, y) = 0 -> None
+    _multifit(X, y) = 0 -> None
+    _internal_predict(X) = 0 -> ndarray(n_samples, n_classes)
+
+>    Graphical visualization methods:
+    
+    loss_curve() -> None
+    score_curve() -> None
+
+Perceptron(LinearClassifier):
+    __init__(): 
+        super().__init__()
+    
+    activation_function:
+        <w,x> + b
+    
+    _internal_predict:
+        heaviside(<w,x> + b) 
+
+    _fit:
+        Rosenblatt's learning algorithm
+
+LogisticRegression(LinearClassifier):
+    self.
+        reg     Regularization coefficient
+    
+
+    __init__(reg)
+
+
+    prob_contour(X, y) -> None
+
+SVM(Model):
+    
+
+MLP(Model):

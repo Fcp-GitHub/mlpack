@@ -1,0 +1,36 @@
+1. Add to classifiers loss function and score.
+2. Adjust API:
+    - Classifier (ABC):  <-- Maybe it should have less "features"
+        - LinearClassifier (ABC): <-- ? Or, for learning purposes: LinearClassifier and LinearRegressor or smt?
+            - Perceptron
+            - Logistic Regression
+        - SVM (ABC):
+            - LinearSVM
+            - GaussSVM
+            - Other kernels...  <--- Maybe as classes like in sklearn?
+        - MLP
+    ! binary and multiclass classifiers should be gathered in single classes 
+      and automatically chosen by some form of dispatching as needed.
+    `fit()` method should have a `verbose` parameter or smt similar. 
+    Some nice textual information:
+    - loss function update during training (e.g. each epoch)
+    - accuracy update during training (e.g. each epoch)
+    - score update during training (e.g. each epoch)
+    - parameter updates (e.g. each iteration, for simpler models)
+    - learning rate schedule 
+    - convergence messages
+    Some nice graphical visualization methods:  <-- add animation functionalities
+    - loss curve against number of epochs or iterations
+      (needs the loss values to be stored, standard, very informative: 
+      - decreasing trend --> learning
+      - plateaus --> convergence or hyperparameter tuning
+      - increasing trend --> instability
+      )
+    - accuracy curve against number of epochs or iterations  ┐
+                                                             ├ Show the improvement in the model's performance
+    - score curve against number of epochs or iterations     ┘
+    - Decision boundary visualization (for 2D datasets)
+    - Probability contours (for probabilistic classifiers)
+    - Feature importance visualization (for come classifiers)
+3. Add visualization and diagnostic functions.
+4. Look for better algorithms. Start with the OVA class.

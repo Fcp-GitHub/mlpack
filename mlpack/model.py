@@ -6,11 +6,15 @@ import abc
 import warnings
 import numpy as np
 
-class Classifier(abc.ABC):
+class Model(abc.ABC):
     """
     Base class for all classifiers.
     """
-    def __init__(self, bias, learning_rate, max_epochs, tolerance, warnings_on=False):
+    def __init__(self, warnings_on=False):
+
+        self.warnings_on = warnings_on
+        self.labels = None
+        self.num_classes = None
 
         if (max_epochs is None) or (max_epochs <= 0) or (int(max_epochs) != max_epochs):
             raise ValueError(f'{self.__str__}: `max_epochs` must be a positive natural number.')
@@ -51,10 +55,10 @@ class Classifier(abc.ABC):
                 _y = np.asarray(y)
 
         # If X is a vector...
-        if _is_vector:
+        if self._is_vector(X):
             _X = np.append(_X, 1)
         else:
-            _X = np.c_[ X, np.ones(_num_samples) ]
+            _X = np.c_[ X, np.ones(self._get_num_samples(X)) ]
 
         return _X, _y
 
