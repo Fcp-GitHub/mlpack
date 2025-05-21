@@ -1,4 +1,28 @@
 1. Add to classifiers loss function and score.
+
+!!!
+Where do I put animating features? It's starting to seem to me that showing the animation of the decision boundary
+during training is a bit useless, since the same animation (and interactive plot) can be achieved right after with
+a dedicated method. It would also introduce much overhead for basically nothing. 
+However, how do I achieve an evolution of the decision boundary after training? Do I make a copy of the classifier
+after each epoch? What information should I retain? Possibilities:
+
+- Array of classifiers 
+	+ DecisionBoundaryDisplay.from_estimator() (suggested method)
+	+ Shouldn't slow down training much
+	- Saves (possibly) many instances of classifier object, which might be heavy both on memory and (possibly) on 
+	  performance
+	- How do I use the `ax` parameter? Should I use it?
+
+- Array of predicted values 
+	+ Saves "only" predicted values
+	- DecisionBoundaryDisplay (just use the constructor)
+	- Might get really large
+	- Requires performing the prediction algorithm each epoch
+
+- Don't use DecisionBoundaryDisplay and make the entire plot
+!!!
+
 2. Adjust API:
     - Classifier (ABC):  <-- Maybe it should have less "features"
         - LinearClassifier (ABC): <-- ? Or, for learning purposes: LinearClassifier and LinearRegressor or smt?

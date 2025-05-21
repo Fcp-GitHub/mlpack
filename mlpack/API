@@ -70,7 +70,7 @@ LinearClassifier(ABC, Model):
 
 >   Internal virtual methods that need to be overridden for 
 >   each model
-    loss_function(X) = 0 -> ndarray(n_samples,)
+    loss_function(X,y) = 0 -> ndarray(n_samples,)
     activation_function(X) = 0 -> ndarray(n_samples, n_classes)
     _fit(X, y) = 0 -> None
     _multifit(X, y) = 0 -> None
@@ -78,8 +78,8 @@ LinearClassifier(ABC, Model):
 
 >    Graphical visualization methods:
     
-    loss_curve() -> None
-    score_curve() -> None
+    plot_loss_curve() -> None
+    plot_score_curve() -> None
 
 Perceptron(LinearClassifier):
     __init__(): 

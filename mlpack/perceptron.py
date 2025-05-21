@@ -1,8 +1,8 @@
 import numpy as np
 
-from mlpack.classifier import Classifier
+from mlpack.model import Model
 
-class Perceptron(Classifier):
+class Perceptron(Model):
     def __init__(self, bias=0, learning_rate=0.3, max_epochs=1000, tolerance=1e-3, *args, **kwargs):
         """
         Perceptron class constructor.
