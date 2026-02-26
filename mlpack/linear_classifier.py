@@ -3,7 +3,6 @@ Abstract Base Class of all linear classifiers.
 """
 
 import abc
-import model
 from itertools import combinations
 
 import numpy as np
@@ -11,10 +10,10 @@ import matplotlib.pyplot as plt
 from sklearn.metrics import f1_score
 from sklearn.inspection import DecisionBoundaryDisplay
 
-from mlpack import visualize
+from mlpack import model, visualize
 
 
-class LinearClassifier(abc.ABC, model.Model):
+class LinearClassifier(model.Model):
     """
     Base class for all linear classifiers.
     """
@@ -72,9 +71,12 @@ class LinearClassifier(abc.ABC, model.Model):
         self.loss    = None
         self.score   = None
 
+        self.binary_classifier = None
+
+        #TODO
         # Internal "function pointer" used to dispatch fit function
         # based on the classification problem (binary vs multiclass)
-        self._internal_fit = None
+        #self._internal_fit = None
 
         # Internal references to animations
         self.fit_anim = None    # For learning animation
@@ -98,13 +100,9 @@ class LinearClassifier(abc.ABC, model.Model):
         pass 
 
     @abc.abstractmethod
-    def _fit_binary(self, X_train: np.ndarray, y_train: np.ndarray):
+    def _internal_fit(self, X_train: np.ndarray, y_train: np.ndarray):
         pass
 
-    @abc.abstractmethod
-    def _fit_multiclass(self, X_train: np.ndarray, y_train: np.ndarray):
-        pass
-    
 
     """ Interface Methods """
 
@@ -189,13 +187,16 @@ class LinearClassifier(abc.ABC, model.Model):
         # following operations:
         # - function dispatching 
         # - weights and bias initialization
-        if self.num_classes == 2:
-            self._internal_fit = self._fit_binary
+
+        #TODO: same class for both classification procedures?
+        #if self.num_classes == 2:
+        if self.binary_classifier or self.num_classes == 2:
+            #self._internal_fit = self._fit_binary
 
             self.weights = np.random.rand(_num_features)
             # Bias already good
         else:
-            self._internal_fit = self._fit_multiclass
+            #self._internal_fit = self._fit_multiclass
 
             # Encode labels into one-hots for multiclass classification
             _y = self._get_one_hot(_y)
@@ -207,8 +208,7 @@ class LinearClassifier(abc.ABC, model.Model):
                     (1, self.num_classes), 
                     self.bias
             )
-
-
+        
         # Array of partially-trained classifiers, used for the animation
         classifiers = None
         if animate == True:
@@ -232,8 +232,10 @@ class LinearClassifier(abc.ABC, model.Model):
             # Save loss and F1-Score values
             self.loss[epoch]  = self.loss_function(_X, _y)
 
-            _y_pred = self.predict(_X)
-            self.score[epoch] = f1_score(_y, _y_pred) 
+            #TODO
+            if self.binary_classifier:
+                _y_pred = self.predict(_X)
+                self.score[epoch] = f1_score(_y, _y_pred) 
 
             if verbose == True:
                 print(f"Epoch: {epoch+1}")

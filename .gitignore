@@ -4,3 +4,7 @@ __pycache__/*
 
 # Packaging files
 mlpack.egg-info/*
+
+# Dev files
+TODO
+*/TODO

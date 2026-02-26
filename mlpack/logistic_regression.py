@@ -1,11 +1,14 @@
 import numpy as np
 
-from mlpack.classifier import Classifier
+from mlpack.linear_classifier import LinearClassifier
 
-class LogisticRegression(Classifier):
-    def __init__(self, bias=0, learning_rate=0.3, max_epochs=1000, tolerance=1e-3, regularization=1e-2, *args, **kwargs):
+class LogisticRegression(LinearClassifier):
+
+    def __init__(self, bias=0, learning_rate=0.3, patience=1000, tolerance=1e-3, regularization=1e-2, *args, **kwargs):
         self.regularization = regularization
-        super().__init__(bias, learning_rate, max_epochs, tolerance, *args, **kwargs)
+        super().__init__(bias, learning_rate, patience, tolerance, *args, **kwargs)
+
+        self.binary_classifier = True
     
     def sigmoid(self, z):
         """
@@ -15,7 +18,6 @@ class LogisticRegression(Classifier):
             return 1 / (1 + np.exp(-z))
         else:
             return np.exp(z) / (1 + np.exp(z))
-
 
     def activation_function(self, X: np.ndarray):
         """
@@ -29,6 +31,9 @@ class LogisticRegression(Classifier):
         else:
             return np.array([self.sigmoid(zi) for zi in z])
 
+    def loss_function(self, X: np.ndarray, y: np.ndarray):
+        #TODO
+        return 0.001
 
     def _internal_predict(self, X: np.ndarray):
         """
@@ -71,10 +76,19 @@ class LogisticRegression(Classifier):
 
         return _current_tol
 
-class SoftmaxRegression(Classifier):
-    def __init__(self, bias=0, learning_rate=0.3, max_epochs=1000, tolerance=1e-3, regularization=1e-2, *args, **kwargs):
+    def __str__(self):
+        return f"LogisticRegression(bias={self.bias}, learning_rate={self.eta}, patience={self.patience}, tolerance={self.tolerance}, regularization={self.regularization}"
+
+    def __repr__(self):
+        return self.__str__()
+
+class SoftmaxRegression(LinearClassifier):
+
+    def __init__(self, bias=0, learning_rate=0.3, patience=1000, tolerance=1e-3, regularization=1e-2, *args, **kwargs):
         self.regularization = regularization
-        super().__init__(bias, learning_rate, max_epochs, tolerance, *args, **kwargs)
+        super().__init__(bias, learning_rate, patience, tolerance, *args, **kwargs)
+
+        self.binary_classifier = False
 
     def softmax(self, z):
         """
@@ -86,6 +100,10 @@ class SoftmaxRegression(Classifier):
     def activation_function(self, X: np.ndarray):
         _dot = np.dot(X, self.weights) + self.bias
         return self.softmax(_dot)
+
+    def loss_function(self, X: np.ndarray, y: np.ndarray):
+        #TODO
+        return 0.001
 
     def _internal_predict(self, X: np.ndarray):
         _prob = self.activation_function(X)
@@ -116,5 +134,9 @@ class SoftmaxRegression(Classifier):
         _current_tol = 1/_num_samples * np.sum(np.abs(y_train - _s))
 
         return _current_tol
+    
+    def __str__():
+        return f"SoftmaxRegression(bias={self.bias}, learning_rate={self.eta}, patience={self.patience}, tolerance={self.tolerance}, regularization={self.regularization}"
 
-
+    def __repr__():
+        return self.__str__()

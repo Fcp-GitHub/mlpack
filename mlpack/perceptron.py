@@ -1,9 +1,10 @@
 import numpy as np
 
-from mlpack.model import Model
+from mlpack.linear_classifier import LinearClassifier
+from mlpack.ova import OneVsAll
 
-class Perceptron(Model):
-    def __init__(self, bias=0, learning_rate=0.3, max_epochs=1000, tolerance=1e-3, *args, **kwargs):
+class Perceptron(LinearClassifier):
+    def __init__(self, bias=0, learning_rate=0.3, patience=1000, tolerance=1e-3, *args, **kwargs):
         """
         Perceptron class constructor.
 
@@ -11,11 +12,13 @@ class Perceptron(Model):
         Parameters
         ----------
         bias: bias that can be used to translate the decision boundary.
-        learning_rate:
-        max_epochs:
+        learning_rate: learning rate used by the learning algorithm.
+        patience: maximum number of epochs for the learning algorithm
         iter_error:
         """
-        super().__init__(bias, learning_rate, max_epochs, tolerance, *args, **kwargs)
+        super().__init__(bias, learning_rate, patience, tolerance, *args, **kwargs)
+
+        self.binary_classifier = True
 
     def activation_function(self, X: np.ndarray):
         """
@@ -27,6 +30,18 @@ class Perceptron(Model):
         X: a monodimensional np.ndarray.
         """
         return np.dot(X, self.weights) + self.bias
+
+    def loss_function(self, X: np.ndarray, y: np.ndarray):
+        """
+        Perceptron's loss function.
+
+        Parameters
+        ----------
+        X: a monodimensional np.ndarray.
+        y: a monodimensional np.ndarray.
+        """
+        #TODO
+        return 0.001#np.max(0, -y*(self.weights*X))
 
     def _internal_predict(self, X: np.ndarray):
         """
@@ -46,8 +61,8 @@ class Perceptron(Model):
         Scalar or np.ndarray vector based on X's shape. As the original Perceptron
         algorithms, returns 0 ("no") or 1 ("yes") based on the classification result.
         """
-        _act = self.activation_function(X)
-        return np.heaviside(_act, 0)
+        score = self.activation_function(X)
+        return np.heaviside(score, 0)
 
     def _internal_fit(self, X_train: np.ndarray, y_train: np.ndarray):
         """
@@ -77,4 +92,8 @@ class Perceptron(Model):
 
         return _current_tol
 
+    def __str__(self):
+        return f"Perceptron(bias={self.bias}, learning_rate={self.eta}, patience={self.patience}, tolerance={self.tolerance})"
 
+    def __repr__(self):
+        return self.__str__()

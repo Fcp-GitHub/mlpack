@@ -4,7 +4,7 @@ OVA strategy implementation with multiprocessing parallelism.
 import numpy as np
 from concurrent.futures import ProcessPoolExecutor
 
-from mlpack.classifier import Classifier
+from mlpack.model import Model
 
 class OneVsAll:
     """
@@ -14,7 +14,7 @@ class OneVsAll:
     The 'OneVsAll' class uses 'concurrent.futures.ProcessPoolExecutor'
     (added with python 3.2) in order to speed up execution via multiprocessing.
     """
-    def __init__(self, classifier: Classifier, args=None, svm_labels=False, workers=None):
+    def __init__(self, classifier: Model, args=None, svm_labels=False, workers=None):
         self.classifier = classifier
         self.classifier_args = args
         self.cdict = None
@@ -44,7 +44,7 @@ class OneVsAll:
                 results[i] = future.result() # Get result
         return results
 
-    def _parallel_fit(self, classifier : Classifier, fnargs):
+    def _parallel_fit(self, classifier : Model, fnargs):
         """
         Internal method for parallelization of fitting method.
         """

@@ -1,5 +1,5 @@
 """
-perceptron.py -- basic binary classifier. 
+This file shows basic usage of package's features.
 """
 
 from sklearn.datasets import load_digits                # built-in hand-written digits dataset
@@ -9,7 +9,11 @@ from sklearn.metrics import accuracy_score              # compute accuracy of th
 from sklearn.metrics import classification_report       # classification metrics
 from sklearn.metrics import confusion_matrix
 
-from mlpack import ova as OVA, perceptron  # For OneVsAll and Perceptron
+from matplotlib import pyplot as plt
+
+from mlpack.ova import OneVsAll
+from mlpack import perceptron, visualize
+
 
 # Load dataset as a (data, target) tuple of two ndarrays:
 #   data:   contains a 2D ndarray of shape (1797,64) with each row
@@ -18,15 +22,17 @@ from mlpack import ova as OVA, perceptron  # For OneVsAll and Perceptron
 X, y = load_digits(return_X_y=True)
 
 # Split dataset into training/validation and testing/heldout data
-X_train, X_test, y_train, y_test = train_test_split(X, y,
-                                                    test_size=0.3,  # 20 % of dataset is for testing
-                                                    random_state=42 # Seed of random number generator
-                                                                    # Passing an integer ensures reproducibility of the results
-                                                    )   
+X_train, X_test, y_train, y_test = train_test_split(
+        X, y,
+        test_size=0.2,  # 20 % of dataset is for testing
+        random_state=42 # Seed of random number generator
+                        # Passing an integer ensures reproducibility of the results
+)   
 
 # Perceptron classifier
-ova = OVA.OneVsAll(perceptron.Perceptron, args=[0,0.1,100,1e-3])
-perceptron = Perceptron(max_iter=100,       # Maximum number of epochs
+ova = OneVsAll(perceptron.Perceptron, args=[0,0.1,100,1e-3])
+perceptron = Perceptron(
+                        max_iter=100,       # Maximum number of epochs
                         eta0=0.1,           # Learning rate
                         random_state=42     # Seed of random number generator
                         )
@@ -40,6 +46,7 @@ perceptron.fit(
 
 # Predict class labels for samples in test dataset 
 fcp_y_pred = ova.predict(X_test)
+print(fcp_y_pred)
 y_pred = perceptron.predict(X_test)
 
 # Compute accuracy of predictions
@@ -59,3 +66,8 @@ cm = confusion_matrix(y_test, fcp_y_pred)
 print("Confusion Matrix:\n", cm)
 cm = confusion_matrix(y_test, y_pred)
 print("Confusion Matrix:\n", cm)
+
+sklearn_pred = visualize.predictions_plot(X_test, y_pred, y_test, "sklearn")
+fcp_pred = visualize.predictions_plot(X_test, fcp_y_pred, y_test, "fcp")
+
+plt.show()
