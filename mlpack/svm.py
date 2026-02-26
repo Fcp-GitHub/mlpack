@@ -1,16 +1,18 @@
 import abc
 import numpy as np
 import copy
+
 from scipy.optimize import minimize, Bounds
 from scipy.spatial import distance
 from cvxopt import matrix as cvxopt_matrix
 from cvxopt import solvers as cvxopt_solvers
 
-from mlpack.classifier import Classifier
+from mlpack.linear_classifier import LinearClassifier
 
-class SVM(Classifier):
-    def __init__(self, bias=0, learning_rate=0.3, max_epochs=1000, tolerance=1e-3, support_vectors_tol=1e-11, regularization=1, *args, **kwargs):
-        super().__init__(bias, learning_rate, 1, tolerance, *args, **kwargs)
+class SVM(LinearClassifier):
+
+    def __init__(self, bias=0, learning_rate=0.3, patience=1, tolerance=1e-3, support_vectors_tol=1e-11, regularization=1, *args, **kwargs):
+        super().__init__(bias, learning_rate, patience, tolerance, *args, **kwargs)
         self.lmul = None    # Lagrange multipliers
         self.is_sv = None
         self.sv_i = None    # Support vectors' indices
@@ -21,6 +23,20 @@ class SVM(Classifier):
 
     def activation_function(self, X: np.ndarray):
         return self.kernel(X, self.weights) + self.bias
+
+    def _compute_score(self, X: np.ndarray):
+        xs, ys = self.Xt[self.sv_i, np.newaxis], self.yt[self.sv_i]
+        # Support vectors
+        l, y, _X = self.lmul[self.is_sv], self.yt[self.is_sv], self.Xt[self.is_sv]
+        # Compute bias
+        self.bias = ys - np.sum(l * y * self.kernel(_X, xs), axis=0)
+        # Compute score
+        return np.sum(l * y * self.kernel(_X, X), axis=0)
+
+
+    def loss_function(self, X: np.ndarray, y: np.ndarray):
+        #TODO
+        return 0.001
 
     @abc.abstractclassmethod
     def kernel(self, xi, xj):
@@ -48,7 +64,7 @@ class SVM(Classifier):
         self.bias = ys - np.sum(l * y * self.kernel(_X, xs), axis=0)
         # Compute score
         score = np.sum(l * y * self.kernel(_X, X), axis=0)
-        return np.sign(score).astype(int), score
+        return np.sign(score).astype(int)#, score
         
 
     def _internal_fit_scipy(self, X_train: np.ndarray, y_train: np.ndarray):
@@ -162,6 +178,12 @@ class SVM(Classifier):
 
         return 1/_num_samples * np.sum(np.abs(y_train - _p))
 
+    def __str__(self):
+        return f"SVM(bias={self.bias}, learning_rate={self.eta}, patience={self.patience}, tolerance={self.tolerance}, support_vectors_tol={self.sv_tol}, regularization={self.regularization}"
+
+    def __repr__(self):
+        return self.__str__()
+
 
 class LinearSVM(SVM):
     def kernel(self, xi, xj):
@@ -226,8 +248,7 @@ class MultiSVM:
         _preds = np.zeros((_num_samples, self.nclasses))
         
         for i, clf in enumerate(self.clfs):
-            _, _preds[:, i] = clf.predict(X)
+            #_, _preds[:, i] = clf.predict(X)
+            _preds[:, i] = clf._compute_score(X)
 
         return np.argmax(_preds, axis=1)
-
-

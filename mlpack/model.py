@@ -17,7 +17,7 @@ class Model(abc.ABC):
         Parameters
         -----------
         warnings_on : Verbosity flag. If `True`, prints 
-                      warnings if necessary.
+                      warnings when needed.
         """
 
         # Verbosity flag

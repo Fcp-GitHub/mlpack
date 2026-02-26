@@ -1,9 +1,11 @@
 README.md
 setup.py
 mlpack/__init__.py
-mlpack/classifier.py
+mlpack/ex.py
+mlpack/linear_classifier.py
 mlpack/logistic_regression.py
 mlpack/mlp.py
+mlpack/model.py
 mlpack/ova.py
 mlpack/perceptron.py
 mlpack/presentation.py

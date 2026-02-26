@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
 from sklearn.inspection import DecisionBoundaryDisplay
 
-import model
+from mlpack import model
 
 
 def _compute_grid_prop(
