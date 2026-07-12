@@ -8,3 +8,6 @@ mlpack.egg-info/**
 # Dev files
 TODO
 */TODO
+
+# Jupyter files
+notes/.ipynb_checkpoints

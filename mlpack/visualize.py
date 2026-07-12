@@ -11,19 +11,21 @@ from mlpack import model
 def _compute_grid_prop(
         num_subplots_x: int | None,
         num_subplots_y: int | None,
-        feat_pairs
+        feat_pairs: itertools.combinations
 ) -> tuple[int, int]:
     """
     Internal utility method that computes the number of rows and columns
     of a grid of subplots, given its inputs.
     """
 
+    num_combinations = sum(1 for _ in feat_pairs)
+
     # If grid parameters are `None` compute them automatically
     if num_subplots_x is None: 
-        num_subplots_x = int( np.ceil( np.sqrt(feat_pairs) ) )
+        num_subplots_x = int( np.ceil( np.sqrt(num_combinations) ) )
 
     if num_subplots_y is None:    
-        num_subplots_y = int( np.ceil( feat_pairs/num_subplots_x ) )
+        num_subplots_y = int( np.ceil( num_combinations/num_subplots_x ) )
 
     return num_subplots_x, num_subplots_y
 
@@ -129,7 +131,6 @@ def animate_decision_boundary(
 
         return scatters
 
-    def update(frame):
         
         # Array of all `PathCollections` returned by `scatter()`
         scatters = []
@@ -176,7 +177,7 @@ def animate_decision_boundary(
     return FuncAnimation(
             fig = fig,
             func = update,
-            frames = len(),
+            #frames = len(),    TODO
             init_func = init_func,
             blit = True,
             repeat = True,

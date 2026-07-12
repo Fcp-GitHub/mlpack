@@ -1,7 +1,15 @@
+"""
+Linear classifier: Perceptron.
+"""
+
+
+""" Third-party packages """
 import numpy as np
 
+""" mlpack resources """
 from mlpack.linear_classifier import LinearClassifier
 from mlpack.ova import OneVsAll
+
 
 class Perceptron(LinearClassifier):
     def __init__(self, bias=0, learning_rate=0.3, patience=1000, tolerance=1e-3, *args, **kwargs):
@@ -97,3 +105,5 @@ class Perceptron(LinearClassifier):
 
     def __repr__(self):
         return self.__str__()
+
+#Perceptron
