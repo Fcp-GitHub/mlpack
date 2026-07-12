@@ -1,27 +1,57 @@
 """
-Abstract Base Class of all the learning models.
+Abstract Base Class for all the learning models.
 """
 
+""" Standard library packages """
 import abc
+from enum import Enum
+
+""" Third-party packages """
 import numpy as np
+
+
+class VerbosityLevel(Enum):
+    """
+    Enumeration used to specify the desired verbosity level.
+
+
+    Values
+    ------
+    SILENCED : silenced
+    MINIMAL  : minimal verbosity
+    HIGH     : high verbosity
+    DEBUG    : max verbosity, for development purposes
+    """
+
+    SILENCED    = 0 # Silenced
+    MINIMAL     = 1 # Minimal verbosity
+    HIGH        = 2 # High verbosity
+    DEBUG       = 3 # Debug option (max verbosity, for development purposes)
+
+#VerbosityLevel
+    
 
 class Model(abc.ABC):
     """
-    Base class for all models.
+    Abstract base class for all models.
     """
-    def __init__(self, warnings_on=False):  # TODO: add verbosity levels
+    def __init__(self, verbosity : VerbosityLevel = VerbosityLevel.SILENCED):
         """
         ABC Model constructor.
         
 
         Parameters
         -----------
+<<<<<<< HEAD
         warnings_on : Verbosity flag. If `True`, prints 
                       warnings when needed.
+=======
+        verbosity : Verbosity flag. See VerbosityLevel class for more details
+>>>>>>> main
         """
 
         # Verbosity flag
-        self.warnings_on = warnings_on
+        self.verbosity = verbosity
 
         # For storing some metadata
         self.labels = None
@@ -30,7 +60,7 @@ class Model(abc.ABC):
 
     """ Utility functions """
 
-    def _is_vector(self, X: np.ndarray):
+    def _is_vector(self, X: np.ndarray):    #TODO: not used
         """
         Check if given `X` is a vector or not.
 
@@ -133,7 +163,7 @@ class Model(abc.ABC):
 
 
     """ Abstract Methods """
-
+    
     @abc.abstractmethod
     def __str__():
         pass
@@ -141,3 +171,5 @@ class Model(abc.ABC):
     @abc.abstractmethod
     def __repr__():
         pass
+
+#Model

@@ -2,23 +2,36 @@
 Abstract Base Class of all linear classifiers.
 """
 
+
+""" Standard library packages """
 import abc
 from itertools import combinations
 
+""" Third-party packages """
 import numpy as np
 import matplotlib.pyplot as plt
+
 from sklearn.metrics import f1_score
 from sklearn.inspection import DecisionBoundaryDisplay
 
+<<<<<<< HEAD
 from mlpack import model, visualize
 
 
 class LinearClassifier(model.Model):
+=======
+""" mlpack resources """
+from mlpack import visualize
+from mlpack.model import Model, VerbosityLevel
+
+
+class LinearClassifier(Model):
+>>>>>>> main
     """
     Base class for all linear classifiers.
     """
     def __init__(self, bias, learning_rate, patience, tolerance, *args, **kwargs):
-        """
+        r"""
         `LinearClassifier` constructor.
         Performs input validation, calls `Model`'s constructor and initializes instance attributes.
 
@@ -46,8 +59,6 @@ class LinearClassifier(model.Model):
         Notes
         -----
         The optional `*args` and `**kwargs` are passed to `Model`'s constructor.
-        If `warnings_on` is set to `True` and the learning algorithm doesn't converge on time,
-        a warning message gets printed.
         """
 
         # Input validation
@@ -58,6 +69,7 @@ class LinearClassifier(model.Model):
 
         # Call `Model`'s constructor
         super().__init__(*args, **kwargs)
+
 
         """ Instance Attributes """
         
@@ -124,7 +136,7 @@ class LinearClassifier(model.Model):
 
         # Input validation
         if self.weights is None or self.bias is None:
-                raise RuntimeError("Model not trained yet. Call `fit()` first.") 
+            raise RuntimeError("Model not trained yet. Call `fit()` first.") 
 
         # Avoid original array modifications
         _X = X
@@ -134,7 +146,6 @@ class LinearClassifier(model.Model):
 
         # Animation flag
         if animate == True:
-
             self.cls_anim = visualize.decision_boundary_grid(
                     self,
                     _X
@@ -143,7 +154,7 @@ class LinearClassifier(model.Model):
         return self._internal_predict(_X)
 
 
-    def fit(self, X_train: np.ndarray, y_train: np.ndarray, verbose: bool = False, animate: bool = False):
+    def fit(self, X_train: np.ndarray, y_train: np.ndarray, verbose: bool = True, animate: bool = False):
         """
         Apply learning algorithm using samples `X_train` and labels `y_train`.
 
@@ -160,7 +171,7 @@ class LinearClassifier(model.Model):
             internally converted to one.
 
         verbose: bool
-            verbosity flag.
+            verbosity flag. Overrides VerbosityLevel (set during object construction).
 
         animate: bool
             animation flag.
@@ -181,6 +192,9 @@ class LinearClassifier(model.Model):
         # Get number of classes and features
         self.num_classes = self._get_num_classes(_y)
 
+        # Detect classifier type
+        self.binary_classifier = self.num_classes == 2
+
         _num_features = self._get_num_features(_X)
 
         # Based on classification problem, perform the
@@ -190,7 +204,11 @@ class LinearClassifier(model.Model):
 
         #TODO: same class for both classification procedures?
         #if self.num_classes == 2:
+<<<<<<< HEAD
         if self.binary_classifier or self.num_classes == 2:
+=======
+        if self.binary_classifier:# or self.num_classes == 2:
+>>>>>>> main
             #self._internal_fit = self._fit_binary
 
             self.weights = np.random.rand(_num_features)
@@ -210,6 +228,7 @@ class LinearClassifier(model.Model):
             )
         
         # Array of partially-trained classifiers, used for the animation
+        #TODO
         classifiers = None
         if animate == True:
             classifiers = []
@@ -237,11 +256,15 @@ class LinearClassifier(model.Model):
                 _y_pred = self.predict(_X)
                 self.score[epoch] = f1_score(_y, _y_pred) 
 
-            if verbose == True:
+            if verbose and self.verbosity is not VerbosityLevel.SILENCED:
                 print(f"Epoch: {epoch+1}")
-                print(f"\tLoss : {self.loss[epoch]:.4f}")
-                print(f"\tScore: {self.score[epoch]:.4f}")
 
+                # Only for high and max verbosity
+                if self.verbosity is not VerbosityLevel.BASIC:
+                    print(f"\tLoss : {self.loss[epoch]:.4f}")
+                    print(f"\tScore: {self.score[epoch]:.4f}")
+
+            #TODO
             if animate == True:
                 classifiers.append(self)
 
@@ -249,12 +272,13 @@ class LinearClassifier(model.Model):
             if ( (1 - self.score[epoch]) < self.tolerance ):
                 return
         
-        if self.warnings_on:
+        if self.verbosity is not VerbosityLevel.SILENCED:
             # If function hasn't returned yet, it means that
             # the number of epochs wasn't enough 
             # to reach convergence
             warnings.warn("Convergence wasn't reached within the specified number of epochs!")
 
+        #TODO: ...what?
         # If the animation flag is set to `True`, show the evolution of
         # the decision boundary through a grid of pairwise plots
         if animate == True:
@@ -264,6 +288,7 @@ class LinearClassifier(model.Model):
             )
 
 
+    #TODO
     """ Interface Graphical Visualization Methods """
 
     def _plot(self, y_values, title: str, **style_kwargs):
