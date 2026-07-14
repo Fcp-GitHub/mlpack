@@ -14,19 +14,12 @@ import matplotlib.pyplot as plt
 from sklearn.metrics import f1_score
 from sklearn.inspection import DecisionBoundaryDisplay
 
-<<<<<<< HEAD
-from mlpack import model, visualize
-
-
-class LinearClassifier(model.Model):
-=======
 """ mlpack resources """
 from mlpack import visualize
 from mlpack.model import Model, VerbosityLevel
 
 
 class LinearClassifier(Model):
->>>>>>> main
     """
     Base class for all linear classifiers.
     """
@@ -204,11 +197,7 @@ class LinearClassifier(Model):
 
         #TODO: same class for both classification procedures?
         #if self.num_classes == 2:
-<<<<<<< HEAD
-        if self.binary_classifier or self.num_classes == 2:
-=======
         if self.binary_classifier:# or self.num_classes == 2:
->>>>>>> main
             #self._internal_fit = self._fit_binary
 
             self.weights = np.random.rand(_num_features)

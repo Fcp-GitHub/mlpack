@@ -42,12 +42,7 @@ class Model(abc.ABC):
 
         Parameters
         -----------
-<<<<<<< HEAD
-        warnings_on : Verbosity flag. If `True`, prints 
-                      warnings when needed.
-=======
         verbosity : Verbosity flag. See VerbosityLevel class for more details
->>>>>>> main
         """
 
         # Verbosity flag

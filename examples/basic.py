@@ -14,65 +14,6 @@ from matplotlib import pyplot as plt
 from mlpack.ova import OneVsAll
 from mlpack import perceptron, visualize
 
-<<<<<<< HEAD:tests/basic.py
-
-# Load dataset as a (data, target) tuple of two ndarrays:
-#   data:   contains a 2D ndarray of shape (1797,64) with each row
-#           representing the features
-#   target: ndarray of shape (1797) which contains the target samples
-X, y = load_digits(return_X_y=True)
-
-# Split dataset into training/validation and testing/heldout data
-X_train, X_test, y_train, y_test = train_test_split(
-        X, y,
-        test_size=0.2,  # 20 % of dataset is for testing
-        random_state=42 # Seed of random number generator
-                        # Passing an integer ensures reproducibility of the results
-)   
-
-# Perceptron classifier
-ova = OneVsAll(perceptron.Perceptron, args=[0,0.1,100,1e-3])
-perceptron = Perceptron(
-                        max_iter=100,       # Maximum number of epochs
-                        eta0=0.1,           # Learning rate
-                        random_state=42     # Seed of random number generator
-                        )
-
-# Train classifier
-ova.fit(X_train, y_train)
-perceptron.fit(
-        X_train,    # Training data
-        y_train     # Target values
-        )    
-
-# Predict class labels for samples in test dataset 
-fcp_y_pred = ova.predict(X_test)
-print(fcp_y_pred)
-y_pred = perceptron.predict(X_test)
-
-# Compute accuracy of predictions
-accuracy = accuracy_score(y_test, fcp_y_pred)
-print(f'Accuracy: {accuracy}')
-accuracy = accuracy_score(y_test, y_pred)
-print(f'Accuracy: {accuracy}')
-
-# Classification report
-class_report = classification_report(y_test, fcp_y_pred)
-print("Classification Report:\n", class_report)
-class_report = classification_report(y_test, y_pred)
-print("Classification Report:\n", class_report)
-
-# Confusion matrix
-cm = confusion_matrix(y_test, fcp_y_pred)
-print("Confusion Matrix:\n", cm)
-cm = confusion_matrix(y_test, y_pred)
-print("Confusion Matrix:\n", cm)
-
-sklearn_pred = visualize.predictions_plot(X_test, y_pred, y_test, "sklearn")
-fcp_pred = visualize.predictions_plot(X_test, fcp_y_pred, y_test, "fcp")
-
-plt.show()
-=======
 if __name__ == "__main__":
     
     # Load dataset as a (data, target) tuple of two ndarrays:
@@ -130,4 +71,3 @@ if __name__ == "__main__":
     fcp_pred = visualize.predictions_plot(X_test, fcp_y_pred, y_test, "fcp")
     
     plt.show()
->>>>>>> main:examples/basic.py
