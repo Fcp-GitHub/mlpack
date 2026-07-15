@@ -21,12 +21,9 @@ class Perceptron(LinearClassifier):
         ----------
         bias: bias that can be used to translate the decision boundary.
         learning_rate: learning rate used by the learning algorithm.
-        patience: maximum number of epochs for the learning algorithm
-        iter_error:
+        patience: maximum number of epochs for the learning algorithm.
         """
         super().__init__(bias, learning_rate, patience, tolerance, *args, **kwargs)
-
-        self.binary_classifier = True
 
     def activation_function(self, X: np.ndarray):
         """
@@ -39,17 +36,18 @@ class Perceptron(LinearClassifier):
         """
         return np.dot(X, self.weights) + self.bias
 
-    def loss_function(self, X: np.ndarray, y: np.ndarray):
+    def loss_function(self, X_train: np.ndarray, y_train: np.ndarray):
         """
         Perceptron's loss function.
 
         Parameters
         ----------
-        X: a monodimensional np.ndarray.
-        y: a monodimensional np.ndarray.
+        X_train: np.ndarray containing the training data samples.
+        y_train: a monodimensional np.ndarray.
         """
-        #TODO
-        return 0.001#np.max(0, -y*(self.weights*X))
+        _temp = -np.dot(y_train, np.matvec(X_train, self.weights))
+
+        return np.max([0, _temp])
 
     def _internal_predict(self, X: np.ndarray):
         """

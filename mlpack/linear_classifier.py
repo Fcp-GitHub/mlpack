@@ -5,6 +5,7 @@ Abstract Base Class of all linear classifiers.
 
 """ Standard library packages """
 import abc
+import warnings
 from itertools import combinations
 
 """ Third-party packages """
@@ -118,7 +119,6 @@ class LinearClassifier(Model):
 
         Parameters
         ----------
-
         X: ndarray of shape (samples, features)
             array of samples. If not an instance of `numpy.ndarray`, it gets
             internally converted to one.
@@ -249,7 +249,7 @@ class LinearClassifier(Model):
                 print(f"Epoch: {epoch+1}")
 
                 # Only for high and max verbosity
-                if self.verbosity is not VerbosityLevel.BASIC:
+                if self.verbosity is not VerbosityLevel.MINIMAL:
                     print(f"\tLoss : {self.loss[epoch]:.4f}")
                     print(f"\tScore: {self.score[epoch]:.4f}")
 
@@ -347,3 +347,5 @@ class LinearClassifier(Model):
         """
         # Plot score values per number of epochs passed
         return self._plot(self.score, "Score function curve", **style_kwargs)
+
+#LinearClassifier

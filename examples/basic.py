@@ -14,6 +14,7 @@ from matplotlib import pyplot as plt
 from mlpack.ova import OneVsAll
 from mlpack import perceptron, visualize
 
+# This is necessary because of how OVA works right now 
 if __name__ == "__main__":
     
     # Load dataset as a (data, target) tuple of two ndarrays:
