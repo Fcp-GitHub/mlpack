@@ -45,9 +45,15 @@ class Perceptron(LinearClassifier):
         X_train: np.ndarray containing the training data samples.
         y_train: a monodimensional np.ndarray.
         """
-        _temp = -np.dot(y_train, np.matvec(X_train, self.weights))
+        # z = Xw
+        z = np.matvec(X_train, self.weights)
 
-        return np.max([0, _temp])
+        # Translate labels
+        y_trans = 2*y_train - 1
+
+        _temp = -np.dot(y_trans, z)
+
+        return np.sum(np.maximum(0, _temp))
 
     def _internal_predict(self, X: np.ndarray):
         """

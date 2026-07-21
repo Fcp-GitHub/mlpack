@@ -18,6 +18,22 @@ The project is organized into different sections:
 - notes:  notes on different Machine Learning techniques.
 
 # Installation
+>[!NOTE]
+> It is advised to manage this package and all related contents in a virtual environment:
+> - **Linux and MacOS**:
+>   ```Shell
+>   mkdir <machine_learning_directory>
+>   cd <machine_learning_directory>
+>   python3 -m venv <name_of_virtual_environment>
+>   ```
+> - **Windows (PowerShell)**:
+>   ```PowerShell
+>   New-Item -Type Directory -Name "<machine_learning_directory>"
+>   Set-Location -Path "<machine_learning_directory>"
+>   py -m venv "<name_of_virtual_environment>"
+>   ```
+> Where `<machine_learning_directory>` and `<name_of_virtual_environment>` are user-defined.
+
 ## Installation using `pip`
 In order to install and use `mlpack`, perform the following (OS-dependent) operations:
 - **Linux and MacOS**: 
@@ -51,3 +67,4 @@ The command has to be issued from the root folder of the directory. The notes pr
 - **Neural Networks**: Multi-Layer Perceptron.
 - **Strategies**: One-Versus-All (OVA).
 - **Visualization**: Using class methods and the `visualize` and `presentation` sub-packages.
+

@@ -8,9 +8,11 @@ from mlpack.model import Model
 
 class OneVsAll:
     """
-    Implementation of One-Vs-Rest strategy for binary classifiers.
+    Implementation of One-Vs-All (or One-Vs-Rest) strategy for binary classifiers.
     
 
+    NOTES
+    -----
     The 'OneVsAll' class uses 'concurrent.futures.ProcessPoolExecutor'
     (added with python 3.2) in order to speed up execution via multiprocessing.
     """
@@ -105,4 +107,4 @@ class OneVsAll:
         _prob = self.activation_function(X)
         return np.argmax(_prob, axis=1)
 
-
+#OneVsAll
