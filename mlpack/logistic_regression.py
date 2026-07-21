@@ -109,8 +109,8 @@ class LogisticRegression(LinearClassifier):
             _b = (1 / _num_samples) * np.sum(_s - y_train)
 
             # 3. Update weights
-            self.weights -= self.eta * _g
-            self.bias -= self.eta * _b
+            self.weights = self.weights - (self.eta * _g)
+            self.bias = self.bias - (self.eta * _b)
 
         # 4. Update current tolerance
         _current_tol = 1/_num_samples * np.sum(np.abs(y_train - _s))
@@ -187,7 +187,7 @@ class SoftmaxRegression(LinearClassifier):
         # Compute predicted values
         _s = self.activation_function(X_train)
 
-        return -np.sum(y_train * np.log(_s), axis=1)
+        return -np.sum(np.sum(y_train * np.log(_s), axis=1))
 
     def _internal_predict(self, X: np.ndarray):
         _prob = self.activation_function(X)
@@ -208,8 +208,8 @@ class SoftmaxRegression(LinearClassifier):
             _b = (1 / _num_samples) * np.sum(_s - y_train, axis=0, keepdims=True)
 
             # 3. Update weights
-            self.weights -= self.eta * _g
-            self.bias -= self.eta * _b
+            self.weights = self.weights - (self.eta * _g)
+            self.bias = self.bias - (self.eta * _b)
 
         # 4. Update current tolerance 
         _current_tol = 1/_num_samples * np.sum(np.abs(y_train - _s))
