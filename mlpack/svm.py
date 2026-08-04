@@ -1,13 +1,25 @@
+"""
+Classifiers: Support Vector Machines.
+"""
+
+
+""" Standard library packages """
 import abc
-import numpy as np
 import copy
+
+""" Third-party packages """
+import numpy as np
 
 from scipy.optimize import minimize, Bounds
 from scipy.spatial import distance
+
 from cvxopt import matrix as cvxopt_matrix
 from cvxopt import solvers as cvxopt_solvers
 
+""" mlpack resources """
+from mlpack.model import Model, VerbosityLevel
 from mlpack.linear_classifier import LinearClassifier
+
 
 class SVM(LinearClassifier):
 
@@ -25,6 +37,9 @@ class SVM(LinearClassifier):
         return self.kernel(X, self.weights) + self.bias
 
     def _compute_score(self, X: np.ndarray):
+        """
+        Internal method needed for multi-class SVM.
+        """
         xs, ys = self.Xt[self.sv_i, np.newaxis], self.yt[self.sv_i]
         # Support vectors
         l, y, _X = self.lmul[self.is_sv], self.yt[self.is_sv], self.Xt[self.is_sv]
@@ -34,9 +49,30 @@ class SVM(LinearClassifier):
         return np.sum(l * y * self.kernel(_X, X), axis=0)
 
 
-    def loss_function(self, X: np.ndarray, y: np.ndarray):
-        #TODO
-        return 0.001
+    def loss_function(self, X_train: np.ndarray, y_train: np.ndarray):
+        """
+        SVMs' loss function (hinge loss function).
+
+
+        Parameters
+        ----------
+        X_train: np.ndarray containing the training data samples.
+        y_train: a monodimensional np.ndarray.
+
+
+        Notes
+        ----
+        Everything is handled considering labels {0, 1}, not {-1, +1}.
+        """
+        # z = Xw
+        z = np.matvec(X_train, self.weights)
+
+        # Translate labels
+        y_trans = 2*y_train - 1
+
+        _temp = np.ones_like(y_trans) - np.dot(y_trans, z)
+
+        return np.sum(np.maximum(0, _temp))
 
     @abc.abstractclassmethod
     def kernel(self, xi, xj):
@@ -47,11 +83,16 @@ class SVM(LinearClassifier):
         pass
 
     def dual(self, l: np.ndarray, K: np.ndarray, y: np.ndarray):
+        """
+        Compute dual objective function.
+        """
         ly = l * y
         return l.sum() - 0.5 * np.dot(ly.T, np.dot(K,ly)) 
 
     def dual_gradient(self, l: np.ndarray, K: np.ndarray, y: np.ndarray):
-        """Calculates the gradient of the dual objective function."""
+        """
+        Compute the gradient of the dual objective function.
+        """
         return np.ones_like(l) - np.dot(K, l * y) * y
 
     def _internal_predict(self, X: np.ndarray):
@@ -67,8 +108,9 @@ class SVM(LinearClassifier):
         return np.sign(score).astype(int)#, score
         
 
+    #TODO: for now the solution is given only solving the dual problem. There should be a parameter to choose if either the primal or the dual has to be solved.
+    #TODO: switch parameter that lets the user choose whether to use scipy of cvxopt
     def _internal_fit_scipy(self, X_train: np.ndarray, y_train: np.ndarray):
-        #TODO: for now the solution is given only solving the dual problem. There should be a parameter to choose if either the primal or the dual has to be solved.
         _num_samples = self._get_num_samples(X_train)
 
         # Define initial parameters for the Lagrange multipliers
@@ -184,6 +226,8 @@ class SVM(LinearClassifier):
     def __repr__(self):
         return self.__str__()
 
+#SVM
+
 
 class LinearSVM(SVM):
     def kernel(self, xi, xj):
@@ -191,6 +235,9 @@ class LinearSVM(SVM):
 
     def gram(self, X: np.ndarray):
         return X @ X.T
+
+#LinearSVM
+
 
 class GaussSVM(SVM):
     def __init__(self, rbf=0.5, *args, **kwargs):
@@ -206,13 +253,34 @@ class GaussSVM(SVM):
         #return np.exp(-self.rbf * _dist)
         return np.exp(-self.rbf * distance.cdist(X, X, 'sqeuclidean'))
 
-class MultiSVM:
-    def __init__(self, clf: SVM, *args, **kwargs):
+#GaussSVM
+
+
+class MultiSVM(Model):
+    def __init__(self, clf: SVM, clf_args: dict, *args, **kwargs):
+        """
+        MultiSVM constructor.
+
+
+        Parameters
+        ---------
+        - clf : model class to use.
+        - clf_args : dictionary of parameter-value pairs used to initialize
+                     the model instances of type `clf`.
+
+
+        Notes
+        -----
+        Any other parameters is passed to `Model`'s constructor.
+        Note that `clf` needs to be a class/type, not an object/instance.
+        """
+
+        # Initialize Model superclass
+        super().__init__(*args, **kwargs)
+
         self.clf = clf
         self.clfs = []
-        self.args = args
-        self.kwargs = kwargs
-        self.nclasses = 0
+        self.clf_args = clf_args
 
     def _task(self, X_train, y_train, i):
         # Get data for the pair
@@ -220,7 +288,7 @@ class MultiSVM:
         # Change labels for multiclass classification
         Ys[Ys != i], Ys[Ys == i] = -1, +1
         # Fit
-        clf = self.clf(*self.args, **self.kwargs)
+        clf = self.clf(**self.clf_args)
         clf.fit(Xs, Ys)
 
         # Save classifier
@@ -228,27 +296,38 @@ class MultiSVM:
 
     def fit(self, X_train: np.ndarray, y_train: np.ndarray):
         self.clfs = []
-        self.nclasses = len(np.unique(y_train))
+        self.num_classes = self._get_num_classes(y_train)
 
-        for i in range(self.nclasses):
+        for i in range(self.num_classes):
             # Get data for the pair
             Xs, Ys = X_train, copy.copy(y_train)
             # Change labels for multiclass classification
             Ys[Ys != i], Ys[Ys == i] = -1, +1
             # Fit
-            clf = self.clf(*self.args, **self.kwargs)
-            print(f"fit {i}", end='\r')
+            clf = self.clf(**self.clf_args)
+
+            if self.verbosity is not VerbosityLevel.SILENCED:
+                print(f"Executing fit number: {i}/{self.num_classes}...", end='\r')
+
             clf.fit(Xs, Ys)
 
             # Save classifier
             self.clfs.append(clf)
 
     def predict(self, X: np.ndarray):
-        _num_samples = X.shape[0]
-        _preds = np.zeros((_num_samples, self.nclasses))
+        _num_samples = self._get_num_samples(X)
+        _preds = np.zeros((_num_samples, self.num_classes))
         
         for i, clf in enumerate(self.clfs):
             #_, _preds[:, i] = clf.predict(X)
             _preds[:, i] = clf._compute_score(X)
 
         return np.argmax(_preds, axis=1)
+
+    def __str__(self):
+        return f"MultiSVM(clf={self.clf}, clf_args={self.clf_args}, num_classes={self.num_classes})"
+
+    def __repr__(self):
+        return self.__str__()
+
+#MultiSVM

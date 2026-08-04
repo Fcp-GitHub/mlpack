@@ -1,10 +1,18 @@
+"""
+Visualization tools.
+"""
+
+
+""" Standard library packages """
 from itertools import combinations
 
+""" Third-party packages """
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
 from sklearn.inspection import DecisionBoundaryDisplay
 
+""" mlpack resources """
 from mlpack import model
 
 
@@ -28,6 +36,8 @@ def _compute_grid_prop(
         num_subplots_y = int( np.ceil( num_combinations/num_subplots_x ) )
 
     return num_subplots_x, num_subplots_y
+
+#_compute_grid_prop
 
 
 def decision_boundary_grid(
@@ -76,6 +86,8 @@ def decision_boundary_grid(
         )
 
     return
+
+#decision_boundary_grid
 
 
 def animate_decision_boundary(
@@ -184,22 +196,23 @@ def animate_decision_boundary(
             interval = 750
     )
 
-def interactive_decision_boundary(
-        num_subplots_x: int | None = None,
-        num_subplots_y: int | None = None
-) -> FuncAnimation:
-    """
-    Generate an interactive plot about the evolution of a linear classifier's decision boundary.
+#animate_decision_boundary
 
 
-    Parameters
-    ----------
+def pixel_predictions_plot(
+        X: np.ndarray, 
+        y_pred: np.ndarray, 
+        y_exp: np.ndarray, 
+        width,
+        height,
+        title="", 
+        num_images=64, 
+        num_subplots_x=8, 
+        num_subplots_y=8
+   
+    ):
     """
-    pass
-
-def predictions_plot(X: np.ndarray, y_pred: np.ndarray, y_exp: np.ndarray, title="", num_images=64, num_subplots_x=8, num_subplots_y=8):
-    """
-    Plot digits with predictions of color green if y_pred = y_exp or red otherwise.
+    Plot images of `width`x`height` pixels with predictions of color green if y_pred = y_exp or red otherwise.
 
     
     Parameters
@@ -240,10 +253,14 @@ def predictions_plot(X: np.ndarray, y_pred: np.ndarray, y_exp: np.ndarray, title
 
     for im,i in zip(_indices, range(num_images)):
         _ax = _fig.add_subplot(num_subplots_x, num_subplots_y, i + 1, xticks=[], yticks=[])
-        # Reshape _X to an array of unknown elements "along the x axis" (number of samples), 8 elements "along the y axis" and 8 elements "along the z axis" (array of 8x8 pixel matrices)
-        _ax.imshow(_X.reshape(-1,8,8)[im], cmap=plt.cm.binary, interpolation='nearest')
+        # Reshape _X to an array of unknown elements "along the x axis" (number of samples), 
+        # `height` elements "along the y axis" and `width` elements "along the z axis" 
+        # (array of `width`x`height` pixel matrices)
+        _ax.imshow(_X.reshape(-1,width,height)[im], cmap=plt.cm.binary, interpolation='nearest')
 
         if _y_pred[im] == _y_exp[im]:
             _ax.text(0, 7, str(_y_pred[im]), color='g')
         else:
             _ax.text(0, 7, str(_y_pred[im]), color='r')
+
+#pixel_predictions_plot

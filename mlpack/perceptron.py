@@ -38,12 +38,18 @@ class Perceptron(LinearClassifier):
 
     def loss_function(self, X_train: np.ndarray, y_train: np.ndarray):
         """
-        Perceptron's loss function.
+        Perceptron's loss function (hinge loss function).
+
 
         Parameters
         ----------
         X_train: np.ndarray containing the training data samples.
         y_train: a monodimensional np.ndarray.
+
+
+        Notes
+        ----
+        Everything is handled considering labels {0, 1}, not {-1, +1}.
         """
         # z = Xw
         z = np.matvec(X_train, self.weights)

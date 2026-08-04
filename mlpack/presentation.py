@@ -12,7 +12,7 @@ def pprint(title: str):
     print(title.center(30))
     print('-'*30)
 
-def present(classifier1: dict, classifier2: dict, standardization=True, slow=False):
+def present_digits(classifier1: dict, classifier2: dict, standardization=True, slow=False):
     """
     Demonstrate `classifier1` (sklearn classifier) and `classifier2` (fcp classifier) in order to compare them using the handwritten
     digits dataset that comes with the scikit-learn library.
@@ -143,10 +143,12 @@ def present(classifier1: dict, classifier2: dict, standardization=True, slow=Fal
     pprint("RESULTS VISUALIZATION")
     if standardization:
         X_test = sc.inverse_transform(X_test)
-    v.predictions_plot(X_test, pred1, y_test, title=name1)
-    v.predictions_plot(X_test, pred2, y_test, title=name2)
+    v.pixel_predictions_plot(X_test, pred1, y_test, width=8, height=8, title=name1)
+    v.pixel_predictions_plot(X_test, pred2, y_test, width=8, height=8, title=name2)
 
     print()
+
+#present_digits
 
 
 def present_dataset(classifier1: dict, classifier2: dict, X: np.ndarray, y:np.ndarray, standardization=True, svm_one_hot=False, slow=False):
@@ -282,7 +284,9 @@ def present_dataset(classifier1: dict, classifier2: dict, X: np.ndarray, y:np.nd
     #pprint("RESULTS VISUALIZATION")
     #if standardization:
     #    X_test = sc.inverse_transform(X_test)
-    #v.predictions_plot(X_test, pred1, y_test, title=name1)
-    #v.predictions_plot(X_test, pred2, y_test, title=name2)
+    #v.pixel_predictions_plot(X_test, pred1, y_test, title=name1)
+    #v.pixel_predictions_plot(X_test, pred2, y_test, title=name2)
 
     print()
+
+#present_dataset

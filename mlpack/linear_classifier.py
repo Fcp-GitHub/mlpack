@@ -240,10 +240,9 @@ class LinearClassifier(Model):
             # Save loss and F1-Score values
             self.loss[epoch]  = self.loss_function(_X, _y)
 
-            #TODO
             if self.binary_classifier:
                 _y_pred = self.predict(_X)
-                self.score[epoch] = f1_score(_y, _y_pred) 
+                self.score[epoch] = f1_score(_y, _y_pred)   #TODO: is this the best solution?
 
             if verbose and self.verbosity is not VerbosityLevel.SILENCED:
                 print(f"Epoch: {epoch+1}")

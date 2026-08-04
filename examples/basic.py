@@ -68,7 +68,7 @@ if __name__ == "__main__":
     cm = confusion_matrix(y_test, y_pred)
     print("Confusion Matrix:\n", cm)
     
-    sklearn_pred = visualize.predictions_plot(X_test, y_pred, y_test, "sklearn")
-    fcp_pred = visualize.predictions_plot(X_test, fcp_y_pred, y_test, "fcp")
+    sklearn_pred = visualize.pixel_predictions_plot(X_test, y_pred, y_test, width=8, height=8, title="sklearn")
+    fcp_pred = visualize.pixel_predictions_plot(X_test, fcp_y_pred, y_test, width=8, height=8, title="fcp")
     
     plt.show()

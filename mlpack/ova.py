@@ -15,8 +15,23 @@ class OneVsAll:
     -----
     The 'OneVsAll' class uses 'concurrent.futures.ProcessPoolExecutor'
     (added with python 3.2) in order to speed up execution via multiprocessing.
+
+    In order to see why multiprocessing is preferred over multithreading see 
+    for example: https://stackoverflow.com/a/51829082.
     """
     def __init__(self, classifier: Model, args=None, svm_labels=False, workers=None):
+        """
+        Class constructor.
+
+        
+        Parameters
+        ----------
+        classifier
+        args
+        svm_labels
+        workers: if `None` uses `os.get_cpu_count()`.
+        """
+
         self.classifier = classifier
         self.classifier_args = args
         self.cdict = None

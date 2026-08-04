@@ -16,6 +16,7 @@ from sklearn.svm import (
 from sklearn.neural_network import MLPClassifier
 from sklearn.model_selection import train_test_split
 
+from mlpack.model import VerbosityLevel
 from mlpack import ova, perceptron, mlp, logistic_regression, svm
 import mlpack.presentation as p
 
@@ -33,7 +34,7 @@ if __name__ == "__main__":
             "name" : "fcp (OVA)"
     }
     
-    p.present(classifier1, classifier2, standardization=False)
+    p.present_digits(classifier1, classifier2, standardization=False)
     plt.show()
     
     # 2. Logistic Regression
@@ -49,7 +50,7 @@ if __name__ == "__main__":
             "name" : "fcp (SoftmaxRegression)"
     }
     
-    p.present(classifier1, classifier2)
+    p.present_digits(classifier1, classifier2)
     plt.show()
     
     # 3. Linear SVM
@@ -60,11 +61,11 @@ if __name__ == "__main__":
     }
     
     classifier2 = {
-            "clf"  : svm.MultiSVM(svm.LinearSVM, patience=1),
+            "clf"  : svm.MultiSVM(svm.LinearSVM, clf_args={"patience":1}, verbosity=VerbosityLevel.HIGH),
             "name" : "fcp (OVA)"
     }
     
-    p.present(classifier1, classifier2, slow=True)
+    p.present_digits(classifier1, classifier2, slow=True)
     plt.show()
     
     # 4. RBF SVM
@@ -75,11 +76,11 @@ if __name__ == "__main__":
     }
     
     classifier2 = {
-            "clf"  : svm.MultiSVM(svm.GaussSVM, patience=1),
+            "clf"  : svm.MultiSVM(svm.GaussSVM, clf_args={"patience":1}, verbosity=VerbosityLevel.HIGH),
             "name" : "fcp (OVA)"
     }
     
-    p.present(classifier1, classifier2, slow=True)
+    p.present_digits(classifier1, classifier2, slow=True)
     plt.show()
     
     # 5. MLP
@@ -90,9 +91,9 @@ if __name__ == "__main__":
     }
     
     classifier2 = {
-            "clf"  : mlp.MLP(64, 128, 10, learning_rate=0.3, patience=200),
+            "clf"  : mlp.MLP(64, 128, 10, learning_rate=0.3, patience=200, verbosity=VerbosityLevel.HIGH),
             "name" : "fcp (MLP)"
     }
     
-    p.present(classifier1, classifier2)
+    p.present_digits(classifier1, classifier2)
     plt.show()
